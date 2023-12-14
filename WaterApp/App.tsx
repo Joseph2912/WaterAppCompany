@@ -5,11 +5,20 @@
  * @format
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { doLogin } from './auth';
 
 
 function App(): React.JSX.Element {
+
+  const onLogin = async () => {
+    await doLogin('hola@mundo.com', '123456')
+  }
+
+  useEffect( () => {
+    onLogin()
+  }, [])
 
   return (
     <View style={styles.container}>
