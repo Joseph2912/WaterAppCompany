@@ -6,113 +6,96 @@
  */
 
 import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+function App(): React.JSX.Element {
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
   return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
+    <View style={styles.container}>
+      <Text style={styles.title}>Login</Text>
+      <View style={styles.inputContainer}>
+        <TextInput
+         // value={email}
+          //onChangeText={(newEmail) => setEmail(newEmail)} 
+          style={styles.input}
+          placeholderTextColor="#ccc"
+          placeholder="User"
+        />
+      </View>
+      <View style={styles.inputContainer}>
+        <TextInput
+         // value={password}
+        // onChangeText={(newPassword) => setPassword(newPassword)}
+          style={styles.input}
+          placeholderTextColor="#ccc"
+          placeholder="Password"
+          secureTextEntry={true}
+        />
+      </View>
+      <TouchableOpacity style={styles.button}>
+        <Text style={styles.buttonText}>Log In</Text>
+      </TouchableOpacity>
+      <Text style={styles.link}>
+        ¿Don't have an account?
+        {/* Aquí va el enlace a la página de registro */}
       </Text>
     </View>
   );
 }
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Hola mundo">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
+export default App;
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  container: {
+    backgroundColor: 'white',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  title: {
+    fontSize: 44,
+    color: 'black',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    top: -90,
   },
-  sectionDescription: {
-    marginTop: 8,
+  inputContainer: {
+    width: 300,
+    height: 40,
+    marginVertical: 18,
+  },
+  input: {
+    flex: 1,
     fontSize: 18,
-    fontWeight: '400',
+    borderRadius: 5,
+    color: '#000',
+    borderColor: '#ccc',
+    backgroundColor: 'white',
+    alignContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    //placeholder: 'black',
   },
-  highlight: {
-    fontWeight: '700',
+  button: {
+    backgroundColor: '#000',
+    height: 40,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    width: 300,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  link: {
+    color: '#000',
+    fontSize: 16,
+    textDecorationLine: 'underline',
+    marginTop: 10,
+    //textDecorationLine: 'none',
   },
 });
-
-export default App;
