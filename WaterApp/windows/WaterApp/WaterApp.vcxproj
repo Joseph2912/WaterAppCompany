@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- This project was created with react-native-windows 0.73.1 -->
+<!-- This project was created with react-native-windows 0.73.2 -->
 <Project ToolsVersion="Current" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(SolutionDir)\ExperimentalFeatures.props" Condition="Exists('$(SolutionDir)\ExperimentalFeatures.props')" />
   <PropertyGroup Label="Globals">
     <CppWinRTOptimized>true</CppWinRTOptimized>
     <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
     <MinimalCoreWin>true</MinimalCoreWin>
-    <ProjectGuid>{70cd717c-6aaa-4303-b5ed-74259546afa8}</ProjectGuid>
+    <ProjectGuid>{89c080f3-d367-43d2-bfc9-ecf0aa2c3238}</ProjectGuid>
     <ProjectName>WaterApp</ProjectName>
     <RootNamespace>WaterApp</RootNamespace>
     <DefaultLanguage>en-US</DefaultLanguage>
