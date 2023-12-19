@@ -9,24 +9,15 @@ import {
 import {doRegister} from '../firebase/auth';
 import {useNavigation} from '@react-navigation/native';
 import {auth} from '../firebase/config';
-import { collection, addDoc } from 'firebase/firestore';
 
 function SignUp(props) {
   const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const RolUser = 1;
-  const RolAdmin = 0;
+
 
   const onRegister = async () => {
     await doRegister(auth, email, password, navigation);
-    // addDoc(collection(db, "User"),{
-    //  email:email,
-    //  password: password,
-    // Rol: RolAdmin,
-    // }).then(() =>{
-
-    //  })
   };
   return (
     <View style={styles.container}>

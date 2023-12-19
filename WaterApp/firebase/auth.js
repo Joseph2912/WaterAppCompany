@@ -3,9 +3,8 @@ import {
   signInWithEmailAndPassword,
   sendEmailVerification,
 } from 'firebase/auth';
-import {collection, addDoc, getDoc, doc} from 'firebase/firestore';
+import {collection, getDoc, doc, setDoc} from 'firebase/firestore';
 import {db} from './config';
-
 
 const doRegister = async (auth, email, password) => {
   try {
@@ -14,18 +13,19 @@ const doRegister = async (auth, email, password) => {
       email,
       password,
     );
+    const uid = register.user.uid;
+    const RolUser = 1;
+    const userDocRef = doc(db, 'User', uid);
+    await setDoc(userDocRef, {
+      Rol: RolUser,
+      email: email,
+      password: password,
+    });
+
     await sendEmailVerification(register.user);
-    const user = register.user;
-    if (user) {
-      console.log('Registro exitoso. UID del nuevo usuario:', user.uid);
-      await addDoc(collection(db, 'User'), {
-        uid: user.uid,
-        email: email,
-        password: password,
-      });
-    }
+    console.log('Usuario creado con éxito');
   } catch (error) {
-    console.log('error creando XD usuario: ', error);
+    console.error('Error al crear usuario:', error);
   }
 };
 
@@ -34,11 +34,26 @@ const doLogin = async (auth, email, password, navigation) => {
     const login = await signInWithEmailAndPassword(auth, email, password);
     const user = login.user;
     if (user.emailVerified) {
-      console.log('Inicio de sesión exitoso. El correo está verificado.');
-       navigation.reset({
-         index: 0,
-         routes: [{name: 'Admin'}],
-       });
+      const uid = user.uid;
+      const userDocRef = doc(db, 'User', uid);
+      const userDocSnapshot = await getDoc(userDocRef);
+      if (userDocSnapshot.exists()) {
+        const rol = userDocSnapshot.data().Rol;
+        console.log(`Inicio de sesión exitoso. Rol del usuario: ${rol}`);
+        if (rol === 0) {
+          navigation.reset({
+            index: 0,
+            routes: [{name: 'Admin'}],
+          });
+        } else {
+          navigation.reset({
+            index: 0,
+            routes: [{name: 'Test'}],
+          });
+        }
+      } else {
+        console.log('Error: No se encontró el documento del usuario.');
+      }
     } else {
       console.log(
         'Error: Por favor verifica tu correo electrónico antes de iniciar sesión.',
