@@ -6,16 +6,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {doLogin} from '../firebase/auth';
+import {doLogin} from '../firebase/doLogin';
 import {useNavigation} from '@react-navigation/native';
 import {auth} from '../firebase/config';
 
-function Login(props) {
+function Login() {
   const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const RolUser = 1;
-  const RolAdmin = 0;
 
   const onLogin = async () => {
     await doLogin(auth, email, password, navigation);
@@ -23,24 +21,33 @@ function Login(props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
+      <Text style={styles.title}>Welcom back</Text>
+      <Text style={styles.Email}>Email</Text>
       <View style={styles.inputContainer}>
         <TextInput
           value={email}
-          onChangeText={newEmail => setEmail(newEmail)}
+          onChangeText={newEmail => setEmail(newEmail.trim())}
           style={styles.input}
           placeholderTextColor="#ccc"
-          placeholder="User"
+          placeholder="Email@gmail.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={true}
+          maxLength={30}
+          minLength={16}
         />
       </View>
+      <Text style={styles.Password}>Password</Text>
       <View style={styles.inputContainer}>
         <TextInput
           value={password}
-          onChangeText={newPassword => setPassword(newPassword)}
+          onChangeText={newPassword => setPassword(newPassword.trim())}
           style={styles.input}
           placeholderTextColor="#ccc"
-          placeholder="Password"
+          placeholder="123456"
           secureTextEntry={true}
+          maxLength={24}
+          minLength={6}
         />
       </View>
       <TouchableOpacity
@@ -53,13 +60,15 @@ function Login(props) {
           onPress={() => {
             onPress = {onLogin};
           }}>
-          Log In
+          Login
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.SignUp}
         onPress={() => {
           navigation.navigate('SignUp');
+          setEmail('');
+          setPassword('');
         }}>
         <Text style={styles.SignUpText}>¿Don't have an account?</Text>
       </TouchableOpacity>
@@ -77,7 +86,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 44,
+    fontSize: 34,
     color: 'black',
     fontWeight: 'bold',
     textAlign: 'center',
@@ -86,10 +95,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     width: 300,
     height: 40,
-    marginVertical: 18,
+    marginVertical: 12,
   },
   input: {
-    flex: 1,
+    flex: 2,
     fontSize: 18,
     borderRadius: 5,
     color: '#000',
@@ -97,8 +106,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     alignContent: 'center',
     alignItems: 'center',
+    padding: 8,
     borderWidth: 1,
-    //placeholder: 'black',
+  },
+  Email: {
+    fontSize: 20,
+    color: 'black',
+    fontWeight: 'normal',
+    left: -118,
+  },
+  Password: {
+    fontSize: 20,
+    color: 'black',
+    fontWeight: 'normal',
+    left: -100,
   },
   button: {
     backgroundColor: '#000',
@@ -112,18 +133,19 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: 'normal',
   },
   SignUp: {
     color: '#000',
     fontSize: 16,
     backgroundColor: 'none',
-    marginTop: 10,
-    //textDecorationLine: 'none',
+    marginTop: 20,
+    left: -50,
   },
   SignUpText: {
     color: '#000',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'light',
+    textAlign: 'left',
   },
 });

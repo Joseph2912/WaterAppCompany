@@ -6,39 +6,47 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {doRegister} from '../firebase/auth';
+import {doRegister} from '../firebase/doRegister';
 import {useNavigation} from '@react-navigation/native';
 import {auth} from '../firebase/config';
 
-function SignUp(props) {
+function SignUp() {
   const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
 
   const onRegister = async () => {
     await doRegister(auth, email, password, navigation);
   };
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>SignUp</Text>
+      <Text style={styles.title}>Create your account</Text>
+      <Text style={styles.Email}>Email</Text>
       <View style={styles.inputContainer}>
         <TextInput
           value={email}
-          onChangeText={newEmail => setEmail(newEmail)}
+          onChangeText={newEmail => setEmail(newEmail.trim())}
           style={styles.input}
           placeholderTextColor="#ccc"
-          placeholder="User"
+          placeholder="Email@gmail.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={true}
+          maxLength={30}
+          minLength={16}
         />
       </View>
+      <Text style={styles.Password}>Password</Text>
       <View style={styles.inputContainer}>
         <TextInput
           value={password}
-          onChangeText={newPassword => setPassword(newPassword)}
+          onChangeText={newPassword => setPassword(newPassword.trim())}
           style={styles.input}
           placeholderTextColor="#ccc"
-          placeholder="Password"
+          placeholder="123456"
           secureTextEntry={true}
+          maxLength={24}
+          minLength={6}
         />
       </View>
       <TouchableOpacity style={styles.button} onPress={onRegister}>
@@ -48,6 +56,8 @@ function SignUp(props) {
         style={styles.Login}
         onPress={() => {
           navigation.navigate('Login');
+          setEmail('');
+          setPassword('');
         }}>
         <Text style={styles.LoginText}>¿Do you have an account?</Text>
       </TouchableOpacity>
@@ -65,7 +75,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 44,
+    fontSize: 34,
     color: 'black',
     fontWeight: 'bold',
     textAlign: 'center',
@@ -74,10 +84,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     width: 300,
     height: 40,
-    marginVertical: 18,
+    marginVertical: 12,
   },
   input: {
-    flex: 1,
+    flex: 2,
     fontSize: 18,
     borderRadius: 5,
     color: '#000',
@@ -85,8 +95,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     alignContent: 'center',
     alignItems: 'center',
+    padding: 8,
     borderWidth: 1,
-    //placeholder: 'black',
+  },
+  Email: {
+    fontSize: 20,
+    color: 'black',
+    fontWeight: 'normal',
+    left: -118,
+  },
+
+  Password: {
+    fontSize: 20,
+    color: 'black',
+    fontWeight: 'normal',
+    left: -100,
   },
   button: {
     backgroundColor: '#000',
@@ -100,25 +123,19 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  link: {
-    color: '#000',
-    fontSize: 16,
-    textDecorationLine: 'underline',
-    marginTop: 10,
-    //textDecorationLine: 'none',
+    fontWeight: 'normal',
   },
   Login: {
     color: '#000',
     fontSize: 16,
     backgroundColor: 'none',
-    marginTop: 10,
-    //textDecorationLine: 'none',
+    marginTop: 20,
+    left: -50,
   },
   LoginText: {
     color: '#000',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'light',
+    textAlign:'left',
   },
 });

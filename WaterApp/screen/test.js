@@ -14,10 +14,10 @@ function Test() {
       console.log('yeeeepp buddyyyyy');
       navigation.reset({
         index: 0,
-        routes: [{name: 'Login'}], // Nombre de la pantalla principal después del inicio de sesión
+        routes: [{name: 'Login'}],
       });
     } catch (error) {
-      console.error('Error al cerrar sesión: ', error);
+      console.error('Error when logging out:', error);
     }
   };
   return (
