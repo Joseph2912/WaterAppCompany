@@ -1,20 +1,20 @@
-import {signInWithEmailAndPassword} from 'firebase/auth';
+import {signInWithEmailAndPassword, onAuthStateChanged} from 'firebase/auth';
 import {getDoc, doc} from 'firebase/firestore';
 import {db} from './config';
 import {Alert} from 'react-native';
 
-const doLogin = async (auth, email, password, navigation) => {
 
+const doLogin = async (auth, email, password, navigation) => {
   // Validation of the form
   if (!email.endsWith('@gmail.com') && !email.endsWith('@hotmail.com')) {
     Alert.alert('Please verify that your email address is written correctly');
-    return;
+    // return;
   } else if (email.length < 13) {
     Alert.alert('Please verify that your email address is written correctly');
-    return;
+    //return;
   } else if (password.length < 6) {
     Alert.alert('The password must be at least 6 characters');
-    return;
+    // return;
   }
   // Log in using Firebase Auth
   try {
@@ -29,7 +29,6 @@ const doLogin = async (auth, email, password, navigation) => {
       const userDocRef = doc(db, 'User', uid);
       const userDocSnapshot = await getDoc(userDocRef);
       if (userDocSnapshot.exists()) {
-
         // Get the role of the user
         const rol = userDocSnapshot.data().Rol;
         console.log(`Successful login. Role of the user: ${rol}`);
@@ -44,7 +43,6 @@ const doLogin = async (auth, email, password, navigation) => {
             routes: [{name: 'Test'}],
           });
         }
-        
       } else {
         console.log('Error: User document not found.');
       }

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,14 +6,55 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {doLogin} from '../firebase/doLogin';
-import {useNavigation} from '@react-navigation/native';
-import {auth} from '../firebase/config';
+import { doLogin } from '../firebase/doLogin';
+import { useNavigation } from '@react-navigation/native';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '../firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
 
 function Login() {
   const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    const checkIfUserIsSignedIn = async () => {
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          const uid = user.uid;
+
+          // Get the user document from Firestore using the correct db instance
+          const userDocRef = doc(db, 'User', uid);
+          const userDocSnapshot = await getDoc(userDocRef);
+
+          if (userDocSnapshot.exists()) {
+            // Get the role of the user
+            const rol = userDocSnapshot.data().Rol;
+            console.log(`User is already signed in. Role of the user: ${rol}`);
+
+            if (rol === 0) {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Admin' }],
+              });
+            } else {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Test' }],
+              });
+            }
+          } else {
+            console.log('Error: User document not found.');
+          }
+        } else {
+          console.log('User is not signed in.');
+        }
+      });
+    };
+
+    // Call the function to check if the user is signed in
+    checkIfUserIsSignedIn();
+  }, [navigation]); // Pass navigation as a dependency to useEffect
 
   const onLogin = async () => {
     await doLogin(auth, email, password, navigation);
@@ -21,7 +62,7 @@ function Login() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcom back</Text>
+      <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.Email}>Email</Text>
       <View style={styles.inputContainer}>
         <TextInput

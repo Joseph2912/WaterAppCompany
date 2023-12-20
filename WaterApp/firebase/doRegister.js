@@ -14,13 +14,13 @@ const doRegister = async (auth, email, password, navigation) => {
       'Error',
       'Please verify that your email address is written correctly',
     );
-    return;
+   // return;
   } else if (email.length < 13) {
     Alert.alert(
       'Error',
       'Please verify that your email address is written correctly',
     );
-    return;
+    //return;
   } else if (password.length < 6) {
     Alert.alert('Error', 'The password must be at least 6 characters');
     return;
