@@ -1,6 +1,6 @@
 import {signInWithEmailAndPassword, onAuthStateChanged} from 'firebase/auth';
 import {getDoc, doc} from 'firebase/firestore';
-import {db} from './config';
+import {db} from './firebase-config';
 import {Alert} from 'react-native';
 
 

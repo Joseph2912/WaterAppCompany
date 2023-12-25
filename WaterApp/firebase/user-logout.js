@@ -21,6 +21,7 @@ function LogOut() {
   };
 
   return (
+    <View>
     <TouchableOpacity
       style={styles.button}
       onPress={() => {
@@ -28,6 +29,7 @@ function LogOut() {
       }}>
       <Text style={styles.buttonText}>Sign Out</Text>
     </TouchableOpacity>
+    </View>
   );
 }
 export default LogOut;

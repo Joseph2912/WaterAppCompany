@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState} from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,63 +6,22 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { doLogin } from '../firebase/doLogin';
-import { useNavigation } from '@react-navigation/native';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import {doRegister} from '../firebase/user-register';
+import {useNavigation} from '@react-navigation/native';
+import {auth} from '../firebase/firebase-config';
 
-function Login() {
+function SignUp() {
   const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  useEffect(() => {
-    const checkIfUserIsSignedIn = async () => {
-      onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          const uid = user.uid;
-
-          // Get the user document from Firestore using the correct db instance
-          const userDocRef = doc(db, 'User', uid);
-          const userDocSnapshot = await getDoc(userDocRef);
-
-          if (userDocSnapshot.exists()) {
-            // Get the role of the user
-            const rol = userDocSnapshot.data().Rol;
-            console.log(`User is already signed in. Role of the user: ${rol}`);
-
-            if (rol === 0) {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Admin' }],
-              });
-            } else {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Test' }],
-              });
-            }
-          } else {
-            console.log('Error: User document not found.');
-          }
-        } else {
-          console.log('User is not signed in.');
-        }
-      });
-    };
-
-    // Call the function to check if the user is signed in
-    checkIfUserIsSignedIn();
-  }, [navigation]); // Pass navigation as a dependency to useEffect
-
-  const onLogin = async () => {
-    await doLogin(auth, email, password, navigation);
+  const onRegister = async () => {
+    await doRegister(auth, email, password);
+    navigation.navigate('Login');
   };
-
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome back</Text>
+      <Text style={styles.title}>Create your account</Text>
       <Text style={styles.Email}>Email</Text>
       <View style={styles.inputContainer}>
         <TextInput
@@ -91,33 +50,21 @@ function Login() {
           minLength={6}
         />
       </View>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => {
-          onLogin();
-        }}>
-        <Text
-          style={styles.buttonText}
-          onPress={() => {
-            onPress = {onLogin};
-          }}>
-          Login
-        </Text>
+      <TouchableOpacity style={styles.button} onPress={onRegister}>
+        <Text style={styles.buttonText}>Sign Up</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={styles.SignUp}
+        style={styles.Login}
         onPress={() => {
-          navigation.navigate('SignUp');
-          setEmail('');
-          setPassword('');
+          navigation.navigate('Login');
         }}>
-        <Text style={styles.SignUpText}>¿Don't have an account?</Text>
+        <Text style={styles.LoginText}>¿Do you have an account?</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-export default Login;
+export default SignUp;
 
 const styles = StyleSheet.create({
   container: {
@@ -156,6 +103,7 @@ const styles = StyleSheet.create({
     fontWeight: 'normal',
     left: -118,
   },
+
   Password: {
     fontSize: 20,
     color: 'black',
@@ -176,17 +124,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'normal',
   },
-  SignUp: {
+  Login: {
     color: '#000',
     fontSize: 16,
     backgroundColor: 'none',
     marginTop: 20,
     left: -50,
   },
-  SignUpText: {
+  LoginText: {
     color: '#000',
     fontSize: 16,
     fontWeight: 'light',
-    textAlign: 'left',
+    textAlign:'left',
   },
 });

@@ -3,11 +3,11 @@ import {
   sendEmailVerification,
 } from 'firebase/auth';
 import {doc, setDoc} from 'firebase/firestore';
-import {db} from './config';
+import {db} from './firebase-config';
 import {Alert} from 'react-native';
 
 // Function to handle user registration
-const doRegister = async (auth, email, password, navigation) => {
+const doRegister = async (auth, email, password) => {
   // Form validation checks
   if (!email.endsWith('@gmail.com') && !email.endsWith('@hotmail.com')) {
     Alert.alert(
@@ -49,10 +49,10 @@ const doRegister = async (auth, email, password, navigation) => {
 
     // Inform the user and navigate to login screen
     Alert.alert('Success', 'We have sent an email to verify your account');
-    navigation.reset({
-      index: 0,
-      routes: [{name: 'Login'}],
-    });
+   // navigation.reset({
+     // index: 0,
+    //  routes: [{name: 'Login'}],
+   // });
   } catch (error) {
     console.error('Error when creating a user:', error);
   }
