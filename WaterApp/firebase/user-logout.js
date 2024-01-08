@@ -1,37 +1,55 @@
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
-import React from 'react';
-import {getAuth, signOut} from 'firebase/auth';
+import React, {useEffect} from 'react';
+import {getAuth, onAuthStateChanged, signOut} from 'firebase/auth';
+import {doc, updateDoc} from 'firebase/firestore';
 import {useNavigation} from '@react-navigation/native';
+import {db} from './firebase-config';
 
 function LogOut() {
   const auth = getAuth();
   const navigation = useNavigation();
+
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigation.navigate('Login');
-      console.log('yeeeepp buddyyyyy');
-      navigation.reset({
-        index: 0,
-        routes: [{name: 'Login'}],
-      });
-    } catch (error) {
-      console.error('Error al cerrar sesión: ', error);
+    const user = auth.currentUser;
+
+    // Verifica si el usuario está autenticado antes de proceder
+    if (user) {
+      try {
+        // Cerrar sesión
+        await signOut(auth);
+
+        // Actualizar el estado del documento en Firestore
+        const userDocRef = doc(db, 'User', user.uid);
+        await updateDoc(userDocRef, {
+          estado: 'inactivo',
+        });
+
+        console.log('User updated in Firestore');
+        navigation.navigate('Login');
+        console.log('Logout successful');
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'Login'}],
+        });
+      } catch (error) {
+        console.error('Error al cerrar sesión: ', error);
+      }
     }
   };
 
   return (
     <View>
-    <TouchableOpacity
-      style={styles.button}
-      onPress={() => {
-        handleLogout();
-      }}>
-      <Text style={styles.buttonText}>Sign Out</Text>
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => {
+          handleLogout();
+        }}>
+        <Text style={styles.buttonText}>Sign Out</Text>
+      </TouchableOpacity>
     </View>
   );
 }
+
 export default LogOut;
 
 const styles = StyleSheet.create({
@@ -46,6 +64,6 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 18,
     fontWeight: 'light',
-    left: 10
+    left: 10,
   },
 });

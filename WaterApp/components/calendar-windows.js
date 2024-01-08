@@ -10,8 +10,9 @@ import {
   Alert,
   BackHandler,
   TouchableWithoutFeedback,
+  PanResponder,
+  Animated,
 } from 'react-native';
-import { Platform } from 'react-native';
 import {Card} from 'react-native-paper';
 import moment from 'moment';
 import {
@@ -19,16 +20,15 @@ import {
   getDocs,
   doc,
   updateDoc,
-  addDoc,
   setDoc,
   deleteDoc,
-  getDoc,
 } from 'firebase/firestore';
 import {onSnapshot} from 'firebase/firestore';
 import {db} from '../firebase/firebase-config';
 import {RegisterClients} from '../firebase/client-register';
+import AdminDrivers from '../screen/admin-drivers';
 
-export default function Calendar() {
+export default function CalendarWindows() {
   const [value, setValue] = useState(new Date());
   const [week, setWeek] = useState(0);
   const [events, setEvents] = useState([]);
@@ -43,31 +43,26 @@ export default function Calendar() {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState({});
   const scrollViewRef = useRef();
+  const [draggedClient, setDraggedClient] = useState(null);
+  const [position, setPosition] = useState({x: 0, y: 0});
 
   useEffect(() => {
     const fetchEventsFromClients = async () => {
       try {
         const clientsCollection = collection(db, 'Clients');
         const clientsSnapshot = await getDocs(clientsCollection);
-  
         const tempEventsData = [];
-  
         await Promise.all(
           clientsSnapshot.docs.map(async clientDoc => {
             const clientData = clientDoc.data();
-            const clientEventsCollectionRef = collection(
-              clientDoc.ref,
-              'date',
-            );
+            const clientEventsCollectionRef = collection(clientDoc.ref, 'date');
             const clientEventsSnapshot = await getDocs(
               clientEventsCollectionRef,
             );
-  
             clientEventsSnapshot.forEach(eventDoc => {
               const eventData = eventDoc.data();
               const timestamp = eventData.date;
               const date = timestamp.toDate();
-  
               tempEventsData.push({
                 id: eventDoc.id,
                 date,
@@ -80,48 +75,41 @@ export default function Calendar() {
             });
           }),
         );
-  
         tempEventsData.sort((a, b) => a.date - b.date);
         setEvents(tempEventsData);
       } catch (error) {
         console.error('Error fetching events from Firestore', error);
       }
     };
-  
-    // Fetch events initially
+
     fetchEventsFromClients();
-  
-    // Clear the interval when the component is unmounted
-    return () => {};
+
+    const intervalId = setInterval(fetchEventsFromClients, 60000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
-  // Handles hardware back press, cancels add modal if it's visible.
   useEffect(() => {
     const handleBackPress = () => {
       if (showAddModal) {
         handleCancelAdd();
         return true;
       }
-
       if (showClientList) {
         setShowClientList(false);
         return true;
       }
-
       return false;
     };
-
     const backHandler = BackHandler.addEventListener(
       'hardwareBackPress',
       handleBackPress,
     );
-
     return () => {
       backHandler.remove();
     };
   }, [showAddModal, showClientList]);
 
-  // Fetches clients data from Firestore when showClientList state changes.
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'Clients'), snapshot => {
       const clientsData = snapshot.docs.map(doc => ({
@@ -130,17 +118,13 @@ export default function Calendar() {
       }));
       setClients(clientsData);
     });
-
     return () => {
       unsubscribe();
     };
   }, [showClientList]);
 
-  // Generates a matrix of dates for three weeks centered around the current week.
-  // Generates a matrix of dates for three weeks centered around the current week.
   const weeks = React.useMemo(() => {
     const start = moment().add(week, 'weeks').startOf('week');
-
     return [-1, 0, 1].map(adj => {
       return Array.from({length: 7}).map((_, index) => {
         const date = moment(start).add(adj, 'week').add(index, 'day');
@@ -153,7 +137,6 @@ export default function Calendar() {
     });
   }, [week]);
 
-  // Filters events to get those matching the selected date.
   const getEventsForSelectedDate = () => {
     return events.filter(event => {
       return (
@@ -163,27 +146,26 @@ export default function Calendar() {
     });
   };
 
-  // Retrieves events for the currently selected date.
   const selectedDateEvents = getEventsForSelectedDate();
 
-  // Navigates to the previous week in the calendar.
   const navigateToPreviousWeek = () => {
     setWeek(week - 1);
     setValue(moment(value).subtract(1, 'week').toDate());
     scrollViewRef.current.scrollTo({x: 0, animated: false});
   };
 
-  // Navigates to the next week in the calendar.
   const navigateToNextWeek = () => {
     setWeek(week + 1);
     setValue(moment(value).add(1, 'week').toDate());
     scrollViewRef.current.scrollTo({x: 0, animated: false});
   };
 
-  // Handles the editing of an event, populating the modal with event details.
   const handleEditEvent = event => {
     setEditedEvent(event);
     setEventText(event.name);
+    setEventPhone(event.phone);
+    setEventAddress(event.address);
+    setEventNeighborhood(event.neighborhood);
     setEventDesc(event.description);
     setShowAddModal(true);
   };
@@ -199,17 +181,13 @@ export default function Calendar() {
         onPress: async () => {
           try {
             const eventToDelete = events.find(event => event.id === eventId);
-
             if (!eventToDelete) {
               console.error('Event not found');
               return;
             }
-
             const clientDocRef = doc(db, 'Clients', eventToDelete.phone);
             const eventsCollectionRef = collection(clientDocRef, 'date');
-
             await deleteDoc(doc(eventsCollectionRef, eventId));
-
             const updatedEvents = events.filter(event => event.id !== eventId);
             setEvents(updatedEvents);
           } catch (error) {
@@ -221,7 +199,6 @@ export default function Calendar() {
     ]);
   };
 
-  // Saves the edited event details and updates the corresponding client in Firestore.
   const saveEditedEvent = async () => {
     if (editedEvent && value) {
       const updatedEvents = events.map(event =>
@@ -236,11 +213,9 @@ export default function Calendar() {
             }
           : event,
       );
-
       setEvents(updatedEvents);
       setEditedEvent(null);
       setShowAddModal(false);
-
       try {
         const clientDocRef = doc(db, 'Clients', editedEvent.phone);
         await updateDoc(clientDocRef, {
@@ -260,7 +235,6 @@ export default function Calendar() {
   const handleAddEvent = () => {
     const formattedDate = value.toISOString().split('T')[0];
     const documentName = `${eventPhone}_${formattedDate}`;
-
     if (value) {
       const newEvent = {
         id: formattedDate,
@@ -271,16 +245,13 @@ export default function Calendar() {
         neighborhood: eventNeighborhood || 'Neighborhood',
         description: eventDesc || 'Description',
       };
-
       setEvents([...events, newEvent]);
-
       setEventText('');
       setEventPhone('');
       setEventAddress('');
       setEventNeighborhood('');
       setEventDesc('');
       setShowAddModal(false);
-
       RegisterClients(
         value,
         eventText,
@@ -292,9 +263,22 @@ export default function Calendar() {
     }
   };
 
-  // Displays the client list by setting the state to show the client list modal.
   const handleShowClientList = () => {
     setShowClientList(true);
+  };
+
+  const handlecloseClientList = () => {
+    setShowClientList(false);
+  };
+
+  const handleClosemodal = () => {
+    setEventText('');
+    setEventPhone('');
+    setEventAddress('');
+    setEventNeighborhood('');
+    setEventDesc('');
+    setEditedEvent(null);
+    setShowAddModal(false);
   };
 
   const handleAddClientToCalendar = async client => {
@@ -310,7 +294,6 @@ export default function Calendar() {
         neighborhood: client.Neighborhood || 'Neighborhood',
         description: client.Description || 'Description',
       });
-
       setEvents([
         ...events,
         {
@@ -323,13 +306,11 @@ export default function Calendar() {
           description: client.Description || 'Description',
         },
       ]);
-
       setShowAddModal(false);
     } catch (error) {
       console.error('Error adding client to calendar and Firestore', error);
     }
   };
-
   const handleCancelAdd = () => {
     setEventText('');
     setEventPhone('');
@@ -340,11 +321,48 @@ export default function Calendar() {
     setShowAddModal(false);
   };
 
-  // Renders a list of clients with a clickable interface to add a selected client to the calendar.
+  const handleDroppedEvent = async value => {
+    try {
+      if (draggedClient) {
+        console.log('Dropped data:', {
+          name: draggedClient.name || 'Namasdasdasdsae',
+          phone: draggedClient.phone,
+          address: draggedClient.address || 'Aasdasdasddress',
+          neighborhood: draggedClient.neighborhood || 'Neighborasdasdasdhood',
+          description: draggedClient.description || 'Desasdasdasdcription',
+        });
+        const clientDocRef = doc(db, 'Clients', draggedClient.phone);
+        const formattedDate = value.toISOString().split('T')[0];
+        const documentName = `${draggedClient.phone}_${formattedDate}`;
+        const eventsCollection = collection(clientDocRef, 'date');
+        const eventData = {
+          date: value,
+          name: draggedClient.name || 'Name',
+          address: draggedClient.address || 'Address',
+          neighborhood: draggedClient.neighborhood || 'Neighborhood',
+          description: draggedClient.description || 'Description',
+        };
+        console.log('Agregando evento con los siguientes datos:', eventData);
+        const newEventDocRef = await setDoc(
+          doc(eventsCollection, documentName),
+          eventData,
+        );
+        console.log('Evento agregado con éxito:', newEventDocRef);
+      }
+    } catch (error) {
+      console.error('Error al agregar el evento:', error);
+    }
+  };
+
   const renderClientList = () => {
     return (
       <View style={styles.clientListContainer}>
         <Text style={styles.clientListTitle}>Client List</Text>
+        <TouchableOpacity
+          style={styles.closeClientButton}
+          onPress={handlecloseClientList}>
+          <Text style={{color: '#ddd', fontSize: 18}}>X</Text>
+        </TouchableOpacity>
         <ScrollView style={styles.clientListScrollView}>
           {clients.map(client => (
             <TouchableOpacity
@@ -362,59 +380,103 @@ export default function Calendar() {
       </View>
     );
   };
+  const DraggableEventCard = ({event, onEdit, onDelete, onDropEvent}) => {
+    const pan = new Animated.ValueXY();
 
-  // Renders a list of event cards, each representing an event on the selected date.
-  const renderEventCards = () => {
+    const panResponder = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: Animated.event([null, {dx: pan.x, dy: pan.y}], {
+        useNativeDriver: false,
+      }),
+      onPanResponderRelease: (event, gesture) => {
+        if (gesture.dx > 50) {
+          setDraggedClient(event);
+          onDropEvent(event);
+        } else {
+          Animated.spring(pan, {
+            toValue: {x: 0, y: 0},
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    });
+
     return (
-      <View style={{flex: 1, paddingHorizontal: 16}}>
-        {/* ScrollView for displaying the list of events */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{
+          transform: [{translateX: pan.x}, {translateY: pan.y}],
+        }}>
+        <Card style={styles.eventCard}>
+          <Card.Content>
+            <Text style={styles.eventDate}>
+              {moment(event.date).format('MMM DD, YYYY')}
+            </Text>
+            <Text style={styles.eventTitle}>Name: {event.name}</Text>
+            <Text style={styles.eventDescription}>Phone: {event.phone}</Text>
+            <Text style={styles.eventDescription}>
+              Address: {event.address}
+            </Text>
+            <Text style={styles.eventDescription}>
+              Neighborhood: {event.neighborhood}
+            </Text>
+            <Text style={styles.eventDescription}>{event.description}</Text>
+          </Card.Content>
+          <View style={styles.eventButtons}>
+            <TouchableOpacity
+              style={[styles.deleteButton]}
+              onPress={() => onDelete(event.id)}>
+              <Text style={styles.TextDelete}>Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.EditButon]}
+              onPress={() => onEdit(event)}>
+              <Text style={styles.TextEdit}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+      </Animated.View>
+    );
+  };
+
+  const renderEventCards = () => {
+    const panResponder = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (event, gestureState) => {
+        setPosition({
+          x: gestureState.dx,
+          y: gestureState.dy,
+        });
+      },
+      onPanResponderRelease: (event, gesture) => {
+        if (gesture.dx > 50) {
+          AdminDrivers.handleDroppedEvent(selectedClient);
+        }
+      },
+    });
+    return (
+      <View style={styles.ContainerCards}>
         <ScrollView
           ref={scrollViewRef}
           vertical
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollViewContent}>
-          {/* Mapping through selectedDateEvents to render individual event cards */}
-          {selectedDateEvents.map(event => (
-            <Card key={event.id} style={styles.eventCard}>
-              {/* Card Content displaying event details */}
-              <Card.Content>
-                <Text style={styles.eventDate}>
-                  {moment(event.date).format('MMM DD, YYYY')}
-                </Text>
-                <Text style={styles.eventTitle}>Name: {event.name}</Text>
-                <Text style={styles.eventDescription}>
-                  Phone: {event.phone}
-                </Text>
-                <Text style={styles.eventDescription}>
-                  Address: {event.address}
-                </Text>
-                <Text style={styles.eventDescription}>
-                  Neighborhood: {event.neighborhood}
-                </Text>
-                <Text style={styles.eventDescription}>{event.description}</Text>
-              </Card.Content>
-              {/* Buttons for editing and deleting the event */}
-              <View style={styles.eventButtons}>
-                <TouchableOpacity
-                  style={[styles.eventButton, {backgroundColor: '#007aff'}]}
-                  onPress={() => handleEditEvent(event)}>
-                  <Text style={styles.eventButtonText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.eventButton, styles.deleteButton]}
-                  onPress={() => handleDeleteEvent(event.id)}>
-                  <Text style={styles.eventButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </Card>
+          {selectedDateEvents.map((event, index) => (
+            <DraggableEventCard
+              key={event.id}
+              event={event}
+              onEdit={handleEditEvent}
+              onDelete={handleDeleteEvent}
+              onDropEvent={() => handleDroppedEvent(selectedClient, value)}
+            />
           ))}
         </ScrollView>
-        {/* Button to add a new event */}
         <TouchableOpacity
           style={styles.btnAddEvent}
           onPress={() => {
             if (showAddModal) {
-              // Adding a new client event to the calendar
               handleAddClientToCalendar({
                 Name: eventText,
                 Id: eventId,
@@ -427,13 +489,15 @@ export default function Calendar() {
               setShowAddModal(true);
             }
           }}>
-          <Text style={{color: '#fff', fontSize: 26, left: 3}}>+</Text>
+          <Text>+</Text>
         </TouchableOpacity>
-
-        {/* Modal for adding or editing events */}
         {showAddModal && (
           <View style={styles.modalContainer}>
-            {/* Input fields for event details */}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleClosemodal}>
+              <Text style={{color: '#ddd', fontSize: 18}}>X</Text>
+            </TouchableOpacity>
             <TextInput
               value={eventText}
               onChangeText={text => setEventText(text)}
@@ -469,7 +533,6 @@ export default function Calendar() {
               placeholder="Description"
               placeholderTextColor="#909090"
             />
-            {/* Conditional rendering of Save button for editing and Add Client button for new events */}
             {editedEvent ? (
               <TouchableOpacity
                 onPress={saveEditedEvent}
@@ -481,15 +544,15 @@ export default function Calendar() {
                 <TouchableOpacity
                   style={styles.addButton}
                   onPress={handleAddEvent}>
-                  <Text style={{color: '#fff', fontSize: 20, left: 3}}>
-                    Add client
+                  <Text style={{color: '#fff', fontSize: 18}}>
+                    Add new client
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.addButton}
                   onPress={handleShowClientList}>
-                  <Text style={{color: '#fff', fontSize: 20, left: 3}}>
-                    Show Client List
+                  <Text style={{color: '#fff', fontSize: 18}}>
+                    Show client list
                   </Text>
                 </TouchableOpacity>
               </>
@@ -499,30 +562,31 @@ export default function Calendar() {
       </View>
     );
   };
-
-  // Renders the main view containing a weekly calendar and either client list or event cards.
   return (
     <SafeAreaView style={styles.container}>
-      {/* Navigation bar for navigating to previous and next weeks */}
+      <View key="monthTitle" style={styles.Header}>
+        <Text style={styles.Dashboard}>Dashboard</Text>
+        <Text style={styles.monthTitle}>
+          {moment(weeks[2][0].date).format('MMMM YYYY')}
+        </Text>
+      </View>
+      <View style={styles.leftbar}>
+        <Text>hola mund</Text>
+      </View>
       <View style={styles.navigation}>
-        {/* Button to navigate to the previous week */}
         <TouchableOpacity
           onPress={navigateToPreviousWeek}
           style={styles.navButton}>
           <Text style={styles.navButtonText}>-</Text>
         </TouchableOpacity>
-        {/* Horizontal ScrollView for displaying the weekly calendar */}
         <ScrollView
           ref={scrollViewRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           pagingEnabled
           contentContainerStyle={styles.scrollViewContent}>
-          {/* Row of days for the current week */}
           <View style={[styles.itemRow, {paddingHorizontal: 10}]}>
-            {/* Mapping through days of the week to render individual day items */}
             {weeks[1].map((item, dateIndex) => {
-              // Checking if the current day is active or has events
               const isActive =
                 value.toDateString() === item.date.toDateString();
               const hasEvents = events.some(
@@ -530,12 +594,10 @@ export default function Calendar() {
                   moment(event.date).format('YYYY-MM-DD') ===
                   moment(item.date).format('YYYY-MM-DD'),
               );
-              // Rendering each day as a touchable item
               return (
                 <TouchableWithoutFeedback
                   key={dateIndex}
                   onPress={() => setValue(item.date)}>
-                  {/* Day item with styling based on active and event conditions */}
                   <View
                     style={[
                       styles.item,
@@ -549,12 +611,12 @@ export default function Calendar() {
                       },
                     ]}>
                     <Text
-                      style={[styles.itemWeekday, isActive && {color: '#fff'}]}>
-                      {item.weekday}
-                    </Text>
-                    <Text
                       style={[styles.itemDate, isActive && {color: '#fff'}]}>
                       {item.date.getDate()}
+                    </Text>
+                    <Text
+                      style={[styles.itemWeekday, isActive && {color: '#fff'}]}>
+                      {item.weekday}
                     </Text>
                   </View>
                 </TouchableWithoutFeedback>
@@ -562,179 +624,223 @@ export default function Calendar() {
             })}
           </View>
         </ScrollView>
-        {/* Button to navigate to the next week */}
         <TouchableOpacity onPress={navigateToNextWeek} style={styles.navButton}>
           <Text style={styles.navButtonText}>+</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Conditional rendering of either client list or event cards based on showClientList state */}
       {showClientList ? renderClientList() : renderEventCards()}
+      <View style={styles.driverView}>
+        <Text style={styles.titleDrivers}>Drivers Online</Text>
+        <AdminDrivers
+          draggedClient={draggedClient}
+          onDropEvent={handleDroppedEvent}
+        />
+      </View>
     </SafeAreaView>
   );
 }
-// Añade un nuevo estilo para los elementos específicos de escritorio
-const desktopStyles = Platform.select({
-  ios: {
-    // Estilos específicos para iOS
-  },
-  android: {
-    // Estilos específicos para Android
-  },
-  web: {
-    // Estilos específicos para la versión de escritorio (web)
-  },
-  default: {
-    item: {
-      height: 60,
-      marginHorizontal: 8,
-      backgroundColor: '#e8e8e8',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
-    },
-    eventButtons: {
-      display: 'flex',
-      flexDirection: 'row',
-      marginTop: 8,
-      width: 200
-    },
-    eventButton: {
-      height: 40,
-      borderRadius: 8,
-      paddingVertical: 8,
-      marginTop: 8,
-      width: '100%',
-      marginHorizontal: 8,
-      backgroundColor: '#007aff',
-    },
-    deleteButton: {
-      width: '100%',
-      backgroundColor: 'red',
-      marginTop: 8,
-    },
-    eventCard: {
-      marginBottom: 12,
-      backgroundColor: '#fff',
-      borderRadius: 16,
-      elevation: 3,
-      borderColor: '#ddd',
-      borderWidth: 1,
-      padding: 16,
-      width: 500
-
-    },
-  },
-});
-
-// ...
-
-// Agrega el nuevo estilo a tu objeto de estilos
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexDirection: 'column',
+    height: '100%',
     paddingTop: 8,
   },
+  leftbar: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: '#fff',
+    height: '100%',
+    width: 70,
+    padding: 15,
+  },
+  driverView: {
+    position: 'absolute',
+    right: 0,
+    backgroundColor: '#fff',
+    height: '100%',
+    width: 350,
+    padding: 15,
+    paddingTop: 30,
+  },
+  titleDrivers: {
+    color: '#000',
+    fontSize: 18,
+    fontWeight: '500',
+    marginLeft: 10,
+  },
+  Header: {
+    marginTop: 16,
+    marginBottom: 20,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexDirection: 'row',
+    width: '66%',
+    left: -160,
+  },
+  monthTitle: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  Dashboard: {
+    backgroundColor: '#f0f0f0',
+    left: 30,
+    color: '#000',
+    fontSize: 30,
+    fontWeight: 'bold',
+  },
   itemRow: {
+    justifyContent: 'space-between',
     width: '100%',
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
   },
   item: {
     flex: 1,
-    height: 50,
-    marginHorizontal: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderRadius: 8,
-    borderColor: '#ddd',
+    height: 55,
+    marginHorizontal: 8,
+    borderRadius: 50,
     flexDirection: 'column',
+    justifyContent: 'center',
     alignItems: 'center',
-    ...desktopStyles.item, // Integra los estilos de escritorio
+    backgroundColor: '#e1e4e6',
   },
   itemWeekday: {
     fontSize: 12,
-    fontWeight: '500',
-    color: '#555',
+    color: '#808080',
   },
   itemDate: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  navigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    left: -150,
+    width: '62%',
+    marginBottom: 25,
+    marginTop: 15,
+  },
+  navButton: {
+    backgroundColor: '#007aff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 40,
+    width: 40,
+    borderRadius: 50,
+  },
+  navButtonText: {
+    top: -4,
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  ContainerCards: {
+    flex: 1,
+    left: -150,
+    width: 900,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    left: -150,
   },
   eventCard: {
-    marginBottom: 8,
+    marginBottom: 12,
     backgroundColor: '#fff',
     borderRadius: 10,
-    elevation: 3,
     borderColor: '#ddd',
     borderWidth: 1,
-    padding: 10,
-    ...desktopStyles.eventCard, // Integra los estilos de escritorio
+    padding: 16,
+    width: 900,
+    height: 'auto',
   },
   eventDate: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#777',
-    marginBottom: 4,
+    marginBottom: 10,
+    marginTop: -6,
   },
   eventTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
   eventDescription: {
+    marginVertical: 2,
     fontSize: 16,
-    color: '#555',
+    color: '#444',
   },
   eventButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    ...desktopStyles.eventButtons, // Integra los estilos de escritorio
+    justifyContent: 'flex-end',
+    marginTop: 20,
   },
-  eventButton: {
-    flex: 1,
+  EditButon: {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
     paddingVertical: 8,
+    marginHorizontal: 8,
     marginTop: 8,
-    ...desktopStyles.eventButton, // Integra los estilos de escritorio
+    width: '12%',
+    backgroundColor: '#007aff',
+  },
+  TextEdit: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#303030',
+    color: '#fff',
+  },
+  TextDelete: {
+    fontSize: 16,
+    color: '#444',
+    color: '#fff',
+  },
+  deleteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 8,
+    marginHorizontal: 8,
+    marginTop: 8,
+    width: '12%',
+    backgroundColor: '#FE4646',
   },
   addButton: {
+    marginVertical: 5,
     justifyContent: 'center',
     alignItems: 'center',
-    height: 45,
+    height: 40,
     color: '#fff',
     backgroundColor: '#007aff',
     borderRadius: 8,
   },
-  eventButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  deleteButton: {
-    marginLeft: 0,
-    backgroundColor: 'red',
-    ...desktopStyles.deleteButton, // Integra los estilos de escritorio
+  closeButton: {
+    marginVertical: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    top: -5,
+    left: 326,
+    height: 40,
+    width: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 8,
+    elevation: 5,
   },
   btnAddEvent: {
-    position: 'absolute',
     justifyContent: 'center',
-    alignContent: 'center',
+    alignItems: 'center',
     bottom: 16,
-    right: 16,
+    right: -850,
     width: 60,
     height: 60,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    borderRadius: 50,
     backgroundColor: '#007aff',
     color: '#fff',
   },
@@ -742,12 +848,13 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: 'white',
     position: 'absolute',
-    bottom: 0,
-    left: 0,
+    bottom: 16,
     right: 0,
     elevation: 5,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderRadius: 8,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    width: 400,
   },
   input: {
     marginBottom: 8,
@@ -756,40 +863,37 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
   },
-  navigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 0,
-    marginBottom: 8,
+  clientListContainer: {
+    bottom: 16,
+    right: -150,
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    width: 300,
+    height: 510,
   },
-  navButton: {
-    backgroundColor: '#007aff',
-    justifyContent: 'center',
-    alignItems: 'center',
+  closeClientButton: {
+    position: 'absolute',
+    top: 16,
+    right: 18,
     height: 30,
     width: 30,
-    borderRadius: 5,
-  },
-  navButtonText: {
-    color: '#fff',
-  },
-  scrollViewContent: {
-    flexGrow: 1,
-  },
-  clientListContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+    backgroundColor: '#ddd',
   },
   clientListTitle: {
-    fontSize: 24,
+    fontSize: 20,
+    color: '#333',
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 10,
+    left: 14,
   },
   clientListScrollView: {
-    marginBottom: 20,
+    marginBottom: 0,
   },
   clientListItem: {
     padding: 15,
@@ -797,7 +901,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ddd',
   },
   clientListItemText: {
-    fontSize: 18,
-    color: '#000',
+    fontSize: 16,
+    color: '#333',
   },
 });

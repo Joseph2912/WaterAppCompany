@@ -1,8 +1,7 @@
-import {signInWithEmailAndPassword, onAuthStateChanged} from 'firebase/auth';
-import {getDoc, doc} from 'firebase/firestore';
+import {signInWithEmailAndPassword} from 'firebase/auth';
+import {getDoc, doc, updateDoc} from 'firebase/firestore';
 import {db} from './firebase-config';
 import {Alert} from 'react-native';
-
 
 const doLogin = async (auth, email, password, navigation) => {
   // Validation of the form
@@ -38,9 +37,18 @@ const doLogin = async (auth, email, password, navigation) => {
             routes: [{name: 'Admin'}],
           });
         } else {
+          try {
+            const clientDocRef = doc(db, 'User', uid);
+            await updateDoc(clientDocRef, {
+              estado: 'activo',
+            });
+            console.log('Client updated in Firestore');
+          } catch (error) {
+            console.error('Error updating client in Firestore', error);
+          }
           navigation.reset({
             index: 0,
-            routes: [{name: 'Test'}],
+            routes: [{name: 'TestUser'}],
           });
         }
       } else {

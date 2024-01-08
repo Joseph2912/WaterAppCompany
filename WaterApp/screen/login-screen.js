@@ -10,7 +10,7 @@ import {doLogin} from '../firebase/user-login';
 import {useNavigation} from '@react-navigation/native';
 import {onAuthStateChanged} from 'firebase/auth';
 import {auth, db} from '../firebase/firebase-config';
-import {doc, getDoc} from 'firebase/firestore';
+import {doc, getDoc, updateDoc} from 'firebase/firestore';
 
 function Login() {
   const navigation = useNavigation();
@@ -40,14 +40,26 @@ function Login() {
             console.log(`User is already signed in. Role of the user: ${rol}`);
 
             if (rol === 0) {
+              console.log('Redirecting to Admin page');
               navigation.reset({
                 index: 0,
                 routes: [{name: 'Admin'}],
               });
             } else {
+              try {
+                const clientDocRef = doc(db, 'User', uid);
+                await updateDoc(clientDocRef, {
+                  estado: 'activo',
+                });
+                console.log('Client updated in Firestore');
+              } catch (error) {
+                console.error('Error updating client in Firestore', error);
+              }
+              console.log('Updating user state to "activo"');
+              console.log('Redirecting to TestUser page');
               navigation.reset({
                 index: 0,
-                routes: [{name: 'Test'}],
+                routes: [{name: 'TestUser'}],
               });
             }
           } else {
@@ -61,7 +73,7 @@ function Login() {
 
     // Call the function to check if the user is signed in
     checkIfUserIsSignedIn();
-  }, [navigation]); // Pass navigation as a dependency to useEffect
+  }, [navigation]);
 
   const onLogin = async () => {
     await doLogin(auth, email, password, navigation);
