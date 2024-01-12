@@ -1,19 +1,20 @@
 // DriverDetailsScreen.js
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { collection, getDocs } from 'firebase/firestore';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { collection, getDocs, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase/firebase-config';
 
 const DriverDetailsScreen = ({ route, navigation }) => {
   const { driverInfo } = route.params;
   const [deliveryDetails, setDeliveryDetails] = useState([]);
+  const [driverLocation, setDriverLocation] = useState(null);
 
   useEffect(() => {
     const fetchDeliveryDetails = async () => {
       try {
         const deliveriesCollection = collection(db, 'User', driverInfo.id, 'delivery');
         const deliveriesSnapshot = await getDocs(deliveriesCollection);
-
+  
         const details = deliveriesSnapshot.docs.map(deliveryDoc => {
           const deliveryData = deliveryDoc.data();
           return {
@@ -23,17 +24,39 @@ const DriverDetailsScreen = ({ route, navigation }) => {
             address: deliveryData.Address || 'No Address',
             neighborhood: deliveryData.neighborhood || 'No Address',
             description: deliveryData.description || 'No Address',
+            latitude:  deliveryData.latitude || 0,
+            longitude:  deliveryData.longitude || 0,
           };
         });
-
+  
         setDeliveryDetails(details);
       } catch (error) {
         console.error('Error fetching delivery details from Firestore', error);
       }
     };
-
+  
+    const unsubscribe = onSnapshot(doc(db, 'User', driverInfo.id), (snapshot) => {
+      const { latitude, longitude } = snapshot.data();
+      setDriverLocation({ latitude, longitude });
+    });
+  
     fetchDeliveryDetails();
-  }, [driverInfo]);
+  
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, [driverInfo.id]);
+  
+  // ...
+  
+  const openExternalMap = (coordinates, title) => {
+    if (coordinates && coordinates.latitude && coordinates.longitude) {
+      const { latitude, longitude } = coordinates;
+      const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      Linking.openURL(mapsLink);
+    } else {
+      console.error('Invalid coordinates for opening external map');
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -57,6 +80,10 @@ const DriverDetailsScreen = ({ route, navigation }) => {
           <Text style={styles.text}>Description: {delivery.description}</Text>
         </View>
       ))}
+
+      <TouchableOpacity style={styles.button} onPress={() => openExternalMap(driverLocation, 'Driver Location')}>
+        <Text style={styles.buttonText}>Open in Maps</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -97,6 +124,17 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   backButtonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  button: {
+    backgroundColor: 'green',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  buttonText: {
     color: '#fff',
     textAlign: 'center',
     fontWeight: 'bold',

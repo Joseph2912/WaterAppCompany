@@ -16,8 +16,8 @@ const Drawer = createDrawerNavigator();
 
 const DrawerAdmin = () => (
   <Drawer.Navigator>
-    <Drawer.Screen name="Home" component={Admin} />
-    <Drawer.Screen name="Drivers" component={AdminDrivers} />
+    <Drawer.Screen name="HomeAdmin" component={Admin} />
+    <Drawer.Screen name="DriversAdmin" component={AdminDrivers} />
   </Drawer.Navigator>
 );
 
@@ -26,6 +26,7 @@ const DrawerUser = () => (
     <Drawer.Screen name="TestUser" component={Test} />
   </Drawer.Navigator>
 );
+
 const Nav = () => (
   <NavigationContainer>
     <Stack.Navigator

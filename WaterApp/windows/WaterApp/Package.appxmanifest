@@ -7,9 +7,9 @@
   IgnorableNamespaces="uap mp">
 
   <Identity
-    Name="bdbfc322-ba82-4894-9a91-5f42ca06a231"
+    Name="test"
     Publisher="CN=josep"
-    Version="1.0.0.0" />
+    Version="1.0.1.0" />
 
   <mp:PhoneIdentity PhoneProductId="bdbfc322-ba82-4894-9a91-5f42ca06a231" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
