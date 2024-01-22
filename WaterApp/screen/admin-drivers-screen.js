@@ -26,7 +26,7 @@ function AdminDrivers() {
         const usersCollection = collection(db, 'User');
         const usersQuery = query(
           usersCollection,
-          where('estado', '==', 'activo'),
+          where('state', '==', 'active'),
         );
         const usersSnapshot = await getDocs(usersQuery);
 
@@ -78,7 +78,7 @@ function AdminDrivers() {
   }, []);
 
   const handleSelectDriver = driver => {
-    setSelectedDriverUid(driver.id); 
+    setSelectedDriverUid(driver.id);
     setSelectedDriver(driver);
     setModalVisible(true);
     setSelectedClient(null);
@@ -91,9 +91,8 @@ function AdminDrivers() {
 
   return (
     <View>
-      <Text>Lista de Usuarios Activos:</Text>
       {loading ? (
-        <Text>Cargando...</Text>
+        <Text style={styles.titleDelivery}>Loading...</Text>
       ) : (
         <FlatList
           data={activeUsers}
@@ -168,21 +167,24 @@ function AdminDrivers() {
 
 const styles = StyleSheet.create({
   cards: {
+    backgroundColor: '#fff',
     justifyContent: 'flex-start',
     alignContent: 'flex-start',
     flexDirection: 'row',
     borderRadius: 16,
-    marginBottom: 8,
+    marginBottom: 3,
+    marginTop: 16,
   },
   disabledListItem: {
-    backgroundColor: 'rgba(0, 0, 0, 0.9)', // Fondo oscuro y transparente
-    opacity: 0.5, // Opacidad reducida
+    backgroundColor: 'rgba(0, 0, 0, 9.0)',
+    opacity: 0.5,
   },
   avatar: {
     marginTop: -15,
     marginHorizontal: 10,
   },
   title: {
+    fontFamily: 'Roboto-Bold',
     marginTop: -15,
     fontWeight: '500',
     fontSize: 18,
@@ -190,6 +192,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   description: {
+    fontFamily: 'Nunito-Medium',
     fontSize: 14,
   },
   deliveryInfoContainer: {
@@ -203,6 +206,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   titleDelivery: {
+    fontFamily: 'Nunito-Medium',
     color: '#555',
     fontSize: 12,
     fontWeight: '400',

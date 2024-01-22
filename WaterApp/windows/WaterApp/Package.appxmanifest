@@ -7,11 +7,11 @@
   IgnorableNamespaces="uap mp">
 
   <Identity
-    Name="test"
+    Name="dc509cc5-e5b2-413c-b14f-3d435a168c38"
     Publisher="CN=josep"
-    Version="1.0.1.0" />
+    Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="bdbfc322-ba82-4894-9a91-5f42ca06a231" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="dc509cc5-e5b2-413c-b14f-3d435a168c38" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>WaterApp</DisplayName>

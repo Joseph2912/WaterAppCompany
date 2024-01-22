@@ -10,8 +10,6 @@ import {
   Alert,
   BackHandler,
   TouchableWithoutFeedback,
-  PanResponder,
-  Animated,
 } from 'react-native';
 import {Card} from 'react-native-paper';
 import moment from 'moment';
@@ -26,7 +24,9 @@ import {
 import {onSnapshot} from 'firebase/firestore';
 import {db} from '../firebase/firebase-config';
 import {RegisterClients} from '../firebase/client-register';
-import AdminDrivers from '../screen/admin-drivers';
+import AdminDrivers from '../screen/admin-drivers-screen';
+import LogOut from '../firebase/user-logout';
+import { useNavigation } from '@react-navigation/native';
 
 export default function CalendarWindows() {
   const [value, setValue] = useState(new Date());
@@ -43,15 +43,16 @@ export default function CalendarWindows() {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState({});
   const scrollViewRef = useRef();
-  const [draggedClient, setDraggedClient] = useState(null);
-  const [position, setPosition] = useState({x: 0, y: 0});
+  const navigation = useNavigation();
 
   useEffect(() => {
     const fetchEventsFromClients = async () => {
       try {
         const clientsCollection = collection(db, 'Clients');
         const clientsSnapshot = await getDocs(clientsCollection);
+
         const tempEventsData = [];
+
         await Promise.all(
           clientsSnapshot.docs.map(async clientDoc => {
             const clientData = clientDoc.data();
@@ -59,10 +60,12 @@ export default function CalendarWindows() {
             const clientEventsSnapshot = await getDocs(
               clientEventsCollectionRef,
             );
+
             clientEventsSnapshot.forEach(eventDoc => {
               const eventData = eventDoc.data();
               const timestamp = eventData.date;
               const date = timestamp.toDate();
+
               tempEventsData.push({
                 id: eventDoc.id,
                 date,
@@ -75,6 +78,7 @@ export default function CalendarWindows() {
             });
           }),
         );
+
         tempEventsData.sort((a, b) => a.date - b.date);
         setEvents(tempEventsData);
       } catch (error) {
@@ -82,29 +86,32 @@ export default function CalendarWindows() {
       }
     };
 
+    // Fetch events initially
     fetchEventsFromClients();
 
-    const intervalId = setInterval(fetchEventsFromClients, 60000);
-
-    return () => clearInterval(intervalId);
+    // Clear the interval when the component is unmounted
+    return () => {};
   }, []);
-
   useEffect(() => {
     const handleBackPress = () => {
       if (showAddModal) {
         handleCancelAdd();
         return true;
       }
+
       if (showClientList) {
         setShowClientList(false);
         return true;
       }
+
       return false;
     };
+
     const backHandler = BackHandler.addEventListener(
       'hardwareBackPress',
       handleBackPress,
     );
+
     return () => {
       backHandler.remove();
     };
@@ -118,6 +125,7 @@ export default function CalendarWindows() {
       }));
       setClients(clientsData);
     });
+
     return () => {
       unsubscribe();
     };
@@ -235,6 +243,7 @@ export default function CalendarWindows() {
   const handleAddEvent = () => {
     const formattedDate = value.toISOString().split('T')[0];
     const documentName = `${eventPhone}_${formattedDate}`;
+
     if (value) {
       const newEvent = {
         id: formattedDate,
@@ -245,13 +254,16 @@ export default function CalendarWindows() {
         neighborhood: eventNeighborhood || 'Neighborhood',
         description: eventDesc || 'Description',
       };
+
       setEvents([...events, newEvent]);
+
       setEventText('');
       setEventPhone('');
       setEventAddress('');
       setEventNeighborhood('');
       setEventDesc('');
       setShowAddModal(false);
+
       RegisterClients(
         value,
         eventText,
@@ -279,6 +291,19 @@ export default function CalendarWindows() {
     setEventDesc('');
     setEditedEvent(null);
     setShowAddModal(false);
+  };
+
+  const handleHome = () => {
+    navigation.dispatch(
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Admin',
+          },
+        ],
+      })
+    );
   };
 
   const handleAddClientToCalendar = async client => {
@@ -321,48 +346,17 @@ export default function CalendarWindows() {
     setShowAddModal(false);
   };
 
-  const handleDroppedEvent = async value => {
-    try {
-      if (draggedClient) {
-        console.log('Dropped data:', {
-          name: draggedClient.name || 'Namasdasdasdsae',
-          phone: draggedClient.phone,
-          address: draggedClient.address || 'Aasdasdasddress',
-          neighborhood: draggedClient.neighborhood || 'Neighborasdasdasdhood',
-          description: draggedClient.description || 'Desasdasdasdcription',
-        });
-        const clientDocRef = doc(db, 'Clients', draggedClient.phone);
-        const formattedDate = value.toISOString().split('T')[0];
-        const documentName = `${draggedClient.phone}_${formattedDate}`;
-        const eventsCollection = collection(clientDocRef, 'date');
-        const eventData = {
-          date: value,
-          name: draggedClient.name || 'Name',
-          address: draggedClient.address || 'Address',
-          neighborhood: draggedClient.neighborhood || 'Neighborhood',
-          description: draggedClient.description || 'Description',
-        };
-        console.log('Agregando evento con los siguientes datos:', eventData);
-        const newEventDocRef = await setDoc(
-          doc(eventsCollection, documentName),
-          eventData,
-        );
-        console.log('Evento agregado con éxito:', newEventDocRef);
-      }
-    } catch (error) {
-      console.error('Error al agregar el evento:', error);
-    }
-  };
-
   const renderClientList = () => {
     return (
       <View style={styles.clientListContainer}>
-        <Text style={styles.clientListTitle}>Client List</Text>
-        <TouchableOpacity
-          style={styles.closeClientButton}
-          onPress={handlecloseClientList}>
-          <Text style={{color: '#ddd', fontSize: 18}}>X</Text>
-        </TouchableOpacity>
+        <View style={styles.headmodal}>
+          <Text style={styles.clientListTitle}>Client List</Text>
+          <TouchableOpacity
+            style={styles.closeClientButton}
+            onPress={handlecloseClientList}>
+            <Text style={{color: '#000', fontSize: 16}}>X</Text>
+          </TouchableOpacity>
+        </View>
         <ScrollView style={styles.clientListScrollView}>
           {clients.map(client => (
             <TouchableOpacity
@@ -380,82 +374,8 @@ export default function CalendarWindows() {
       </View>
     );
   };
-  const DraggableEventCard = ({event, onEdit, onDelete, onDropEvent}) => {
-    const pan = new Animated.ValueXY();
 
-    const panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: Animated.event([null, {dx: pan.x, dy: pan.y}], {
-        useNativeDriver: false,
-      }),
-      onPanResponderRelease: (event, gesture) => {
-        if (gesture.dx > 50) {
-          setDraggedClient(event);
-          onDropEvent(event);
-        } else {
-          Animated.spring(pan, {
-            toValue: {x: 0, y: 0},
-            useNativeDriver: false,
-          }).start();
-        }
-      },
-    });
-
-    return (
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={{
-          transform: [{translateX: pan.x}, {translateY: pan.y}],
-        }}>
-        <Card style={styles.eventCard}>
-          <Card.Content>
-            <Text style={styles.eventDate}>
-              {moment(event.date).format('MMM DD, YYYY')}
-            </Text>
-            <Text style={styles.eventTitle}>Name: {event.name}</Text>
-            <Text style={styles.eventDescription}>Phone: {event.phone}</Text>
-            <Text style={styles.eventDescription}>
-              Address: {event.address}
-            </Text>
-            <Text style={styles.eventDescription}>
-              Neighborhood: {event.neighborhood}
-            </Text>
-            <Text style={styles.eventDescription}>{event.description}</Text>
-          </Card.Content>
-          <View style={styles.eventButtons}>
-            <TouchableOpacity
-              style={[styles.deleteButton]}
-              onPress={() => onDelete(event.id)}>
-              <Text style={styles.TextDelete}>Delete</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.EditButon]}
-              onPress={() => onEdit(event)}>
-              <Text style={styles.TextEdit}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-        </Card>
-      </Animated.View>
-    );
-  };
-
-  const renderEventCards = () => {
-    const panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: (event, gestureState) => {
-        setPosition({
-          x: gestureState.dx,
-          y: gestureState.dy,
-        });
-      },
-      onPanResponderRelease: (event, gesture) => {
-        if (gesture.dx > 50) {
-          AdminDrivers.handleDroppedEvent(selectedClient);
-        }
-      },
-    });
+  const EventCard = () => {
     return (
       <View style={styles.ContainerCards}>
         <ScrollView
@@ -464,40 +384,58 @@ export default function CalendarWindows() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollViewContent}>
           {selectedDateEvents.map((event, index) => (
-            <DraggableEventCard
-              key={event.id}
-              event={event}
-              onEdit={handleEditEvent}
-              onDelete={handleDeleteEvent}
-              onDropEvent={() => handleDroppedEvent(selectedClient, value)}
-            />
+            <View key={event.id} style={styles.eventCard}>
+              <Card.Content>
+                <View style={styles.delete}>
+                  <TouchableOpacity
+                    style={[styles.deleteButton]}
+                    onPress={() => handleDeleteEvent(event.id)}>
+                    <Text style={styles.TextDelete}>X</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.eventDate}>
+                  {moment(event.date).format('MMM DD, YYYY')}
+                </Text>
+                <Text style={styles.eventDescription}>
+                  NAME:
+                  <Text style={styles.eventTitle}> {event.name}</Text>
+                </Text>
+                <Text style={styles.eventDescription}>
+                  PHONE: <Text style={styles.eventTitle}>{event.phone}</Text>
+                </Text>
+                <Text style={styles.eventDescription}>
+                  ADDRESS:{' '}
+                  <Text style={styles.eventTitle}>{event.address}</Text>
+                </Text>
+                <Text style={styles.eventDescription}>
+                  NEIGHBORHOOD:{' '}
+                  <Text style={styles.eventTitle}>{event.neighborhood}</Text>
+                </Text>
+                <Text style={styles.eventDescription}>
+                  COMMENT:{' '}
+                  <Text style={styles.eventTitle}>{event.description}</Text>
+                </Text>
+              </Card.Content>
+              <View style={styles.eventButtons}>
+                <TouchableOpacity
+                  style={[styles.EditButon]}
+                  onPress={() => handleEditEvent(event)}>
+                  <Text style={styles.TextEdit}>Edit</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           ))}
         </ScrollView>
-        <TouchableOpacity
-          style={styles.btnAddEvent}
-          onPress={() => {
-            if (showAddModal) {
-              handleAddClientToCalendar({
-                Name: eventText,
-                Id: eventId,
-                Phone: eventPhone,
-                Address: eventAddress,
-                Neighborhood: eventNeighborhood,
-                Description: eventDesc,
-              });
-            } else {
-              setShowAddModal(true);
-            }
-          }}>
-          <Text>+</Text>
-        </TouchableOpacity>
         {showAddModal && (
           <View style={styles.modalContainer}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleClosemodal}>
-              <Text style={{color: '#ddd', fontSize: 18}}>X</Text>
-            </TouchableOpacity>
+            <View style={styles.headmodal}>
+              <Text style={styles.clientListTitle}>Client Information</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleClosemodal}>
+                <Text style={{color: '#444', fontSize: 18}}>X</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               value={eventText}
               onChangeText={text => setEventText(text)}
@@ -509,7 +447,7 @@ export default function CalendarWindows() {
               value={eventPhone}
               onChangeText={phone => setEventPhone(phone)}
               style={styles.input}
-              placeholder="Phone number"
+              placeholder="Phone"
               placeholderTextColor="#909090"
             />
             <TextInput
@@ -537,24 +475,44 @@ export default function CalendarWindows() {
               <TouchableOpacity
                 onPress={saveEditedEvent}
                 style={styles.addButton}>
-                <Text style={{color: '#fff', fontSize: 20, left: 3}}>Save</Text>
+                <Text
+                  style={{
+                    color: '#fff',
+                    fontSize: 16,
+                    fontFamily: 'Nunito-Medium',
+                    left: 3,
+                  }}>
+                  Save Edit
+                </Text>
               </TouchableOpacity>
             ) : (
               <>
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={handleAddEvent}>
-                  <Text style={{color: '#fff', fontSize: 18}}>
-                    Add new client
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={handleShowClientList}>
-                  <Text style={{color: '#fff', fontSize: 18}}>
-                    Show client list
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.modalbuttons}>
+                  <TouchableOpacity
+                    style={styles.addButtonclientlist}
+                    onPress={handleShowClientList}>
+                    <Text
+                      style={{
+                        color: '#000',
+                        fontSize: 16,
+                        fontFamily: 'Roboto-Bold',
+                      }}>
+                      Client List
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={handleAddEvent}>
+                    <Text
+                      style={{
+                        color: '#fff',
+                        fontSize: 16,
+                        fontFamily: 'Nunito-Medium',
+                      }}>
+                      Add Client
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
           </View>
@@ -564,111 +522,179 @@ export default function CalendarWindows() {
   };
   return (
     <SafeAreaView style={styles.container}>
-      <View key="monthTitle" style={styles.Header}>
-        <Text style={styles.Dashboard}>Dashboard</Text>
-        <Text style={styles.monthTitle}>
-          {moment(weeks[2][0].date).format('MMMM YYYY')}
-        </Text>
-      </View>
       <View style={styles.leftbar}>
-        <Text>hola mund</Text>
-      </View>
-      <View style={styles.navigation}>
-        <TouchableOpacity
-          onPress={navigateToPreviousWeek}
-          style={styles.navButton}>
-          <Text style={styles.navButtonText}>-</Text>
-        </TouchableOpacity>
-        <ScrollView
-          ref={scrollViewRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          pagingEnabled
-          contentContainerStyle={styles.scrollViewContent}>
-          <View style={[styles.itemRow, {paddingHorizontal: 10}]}>
-            {weeks[1].map((item, dateIndex) => {
-              const isActive =
-                value.toDateString() === item.date.toDateString();
-              const hasEvents = events.some(
-                event =>
-                  moment(event.date).format('YYYY-MM-DD') ===
-                  moment(item.date).format('YYYY-MM-DD'),
-              );
-              return (
-                <TouchableWithoutFeedback
-                  key={dateIndex}
-                  onPress={() => setValue(item.date)}>
-                  <View
-                    style={[
-                      styles.item,
-                      isActive && {
-                        backgroundColor: '#007aff',
-                        borderColor: '#007aff',
-                      },
-                      hasEvents && {
-                        borderWidth: 2,
-                        borderColor: '#007aff',
-                      },
-                    ]}>
-                    <Text
-                      style={[styles.itemDate, isActive && {color: '#fff'}]}>
-                      {item.date.getDate()}
-                    </Text>
-                    <Text
-                      style={[styles.itemWeekday, isActive && {color: '#fff'}]}>
-                      {item.weekday}
-                    </Text>
-                  </View>
-                </TouchableWithoutFeedback>
-              );
-            })}
-          </View>
-        </ScrollView>
-        <TouchableOpacity onPress={navigateToNextWeek} style={styles.navButton}>
-          <Text style={styles.navButtonText}>+</Text>
+        <View>
+          <Text style={styles.titleDrivers}>Water App</Text>
+        </View>
+        <View style={styles.space}>
+        <TouchableOpacity onPress={handleHome}  style={styles.btnAddEvent}>
+            <Text style={styles.btnAddEventText}>Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btnAddEvent}
+            onPress={() => {
+              if (showAddModal) {
+                handleAddClientToCalendar({
+                  Name: eventText,
+                  Id: eventId,
+                  Phone: eventPhone,
+                  Address: eventAddress,
+                  Neighborhood: eventNeighborhood,
+                  Description: eventDesc,
+                });
+              } else {
+                setShowAddModal(true);
+              }
+            }}>
+            <Text style={styles.btnAddEventText}>Add client</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnAddEvent}>
+            <Text style={styles.btnAddEventText}>Drivers</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnAddEvent}>
+            <Text style={styles.btnAddEventText}>Reports</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnAddEvent}>
+            <Text style={styles.btnAddEventText}>Settings</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.LogOut}>
+          <LogOut />
         </TouchableOpacity>
       </View>
-      {showClientList ? renderClientList() : renderEventCards()}
+      <View style={styles.calendar}>
+        <View key="monthTitle" style={styles.Header}>
+          <Text style={styles.Dashboard}>Dashboard</Text>
+          <Text style={styles.monthTitle}>
+            {moment(weeks[2][0].date).format('MMMM YYYY')}
+          </Text>
+        </View>
+        <View style={styles.navigation}>
+          <TouchableOpacity
+            onPress={navigateToPreviousWeek}
+            style={styles.navButton}>
+            <Text style={styles.navButtonText}>-</Text>
+          </TouchableOpacity>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.scrollViewContent}>
+            <View style={[styles.itemRow, {paddingHorizontal: 10}]}>
+              {weeks[1].map((item, dateIndex) => {
+                const isActive =
+                  value.toDateString() === item.date.toDateString();
+                const hasEvents = events.some(
+                  event =>
+                    moment(event.date).format('YYYY-MM-DD') ===
+                    moment(item.date).format('YYYY-MM-DD'),
+                );
+                return (
+                  <TouchableWithoutFeedback
+                    key={dateIndex}
+                    onPress={() => setValue(item.date)}>
+                    <View
+                      style={[
+                        styles.item,
+                        isActive && {
+                          backgroundColor: '#007aff',
+                          borderColor: '#007aff',
+                        },
+                        hasEvents && {
+                          borderWidth: 2,
+                          borderColor: '#007aff',
+                        },
+                      ]}>
+                      <Text
+                        style={[styles.itemDate, isActive && {color: '#fff'}]}>
+                        {item.date.getDate()}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.itemWeekday,
+                          isActive && {color: '#fff'},
+                        ]}>
+                        {item.weekday}
+                      </Text>
+                    </View>
+                  </TouchableWithoutFeedback>
+                );
+              })}
+            </View>
+          </ScrollView>
+          <TouchableOpacity
+            onPress={navigateToNextWeek}
+            style={styles.navButton}>
+            <Text style={styles.navButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
+
+        {showClientList ? renderClientList() : EventCard()}
+      </View>
       <View style={styles.driverView}>
-        <Text style={styles.titleDrivers}>Drivers Online</Text>
-        <AdminDrivers
-          draggedClient={draggedClient}
-          onDropEvent={handleDroppedEvent}
-        />
+        <Text style={styles.titleDrivers}>Online Drivers</Text>
+        <View style={styles.adminDriversContainer}>
+          <AdminDrivers />
+        </View>
       </View>
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
-    justifyContent: 'space-between',
+    flex: 1,
+    display: 'flex',
+    backgroundColor: '#fff',
     alignItems: 'center',
-    flexDirection: 'column',
+    flexDirection: 'row',
     height: '100%',
-    paddingTop: 8,
   },
   leftbar: {
-    position: 'absolute',
-    left: 0,
+    paddingTop: 30,
+    paddingBottom: 30,
+    flexDirection: 'column',
+    padding: 10,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
     backgroundColor: '#fff',
     height: '100%',
-    width: 70,
-    padding: 15,
+    width: 200,
+  },
+  calendar: {
+    flex: 1,
+    paddingTop: 100,
+    paddingBottom: 100,
+    paddingLeft: 40,
+    paddingRight: 40,
+    flexDirection: 'column',
+    alignItems: 'center',
+    backgroundColor: '#fff',
   },
   driverView: {
-    position: 'absolute',
-    right: 0,
-    backgroundColor: '#fff',
+    paddingTop: 25,
+    backgroundColor: '#EFEEF3',
     height: '100%',
-    width: 350,
-    padding: 15,
-    paddingTop: 30,
+    width: 400,
+    borderLeftWidth: 0.5,
+    borderColor: '#ddd',
+    paddingLeft: 20,
+    paddingRight: 20,
+  },
+
+  adminDriversContainer: {
+    flex: 1,
   },
   titleDrivers: {
+    fontFamily: 'Roboto-Bold',
     color: '#000',
-    fontSize: 18,
-    fontWeight: '500',
+    fontWeight: 'bold',
+    fontSize: 20,
+    marginTop: 10,
     marginLeft: 10,
+    marginBottom: 30,
   },
   Header: {
     marginTop: 16,
@@ -676,22 +702,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     flexDirection: 'row',
-    width: '66%',
-    left: -160,
+    width: '100%',
   },
   monthTitle: {
     color: '#000',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
+    fontFamily: 'Nunito-Medium',
   },
   Dashboard: {
-    backgroundColor: '#f0f0f0',
-    left: 30,
+    fontFamily: 'Roboto-Bold',
     color: '#000',
     fontSize: 30,
     fontWeight: 'bold',
   },
   itemRow: {
+    flex: 1,
     justifyContent: 'space-between',
     width: '100%',
     flexDirection: 'row',
@@ -700,28 +726,36 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 55,
     marginHorizontal: 8,
-    borderRadius: 50,
+    borderRadius: 15,
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e1e4e6',
   },
   itemWeekday: {
-    fontSize: 12,
+    fontFamily: 'Nunito-Medium',
+    fontSize: 13,
     color: '#808080',
   },
+  space: {
+    marginBottom: 50,
+  },
   itemDate: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Roboto-Bold',
+    fontWeight: '600',
+    fontSize: 20,
     color: '#000',
+  },
+  headmodal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignContent: 'center',
   },
   navigation: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    left: -150,
-    width: '62%',
-    marginBottom: 25,
+    width: '100%',
+    marginBottom: 30,
     marginTop: 15,
   },
   navButton: {
@@ -739,40 +773,49 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   ContainerCards: {
-    flex: 1,
-    left: -150,
-    width: 900,
+    flexGrow: 1,
+    flexDirection: 'column',
+    width: '100%',
+    height: '100%',
   },
   scrollViewContent: {
-    flexGrow: 1,
-    left: -150,
+    width: '100%',
   },
   eventCard: {
     marginBottom: 12,
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    borderWidth: 2,
+    borderRadius: 20,
     borderColor: '#ddd',
-    borderWidth: 1,
     padding: 16,
-    width: 900,
+    width: '100%',
     height: 'auto',
+    flexDirection: 'column',
   },
   eventDate: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#777',
     marginBottom: 10,
     marginTop: -6,
+    fontFamily: 'Nunito-Medium',
   },
   eventTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '400',
     color: '#333',
     marginBottom: 8,
+    fontFamily: 'Nunito-Medium',
   },
   eventDescription: {
-    marginVertical: 2,
+    marginVertical: 7,
     fontSize: 16,
-    color: '#444',
+    color: '#999',
+    fontWeight: '500',
+    fontFamily: 'Roboto-Bold',
+  },
+  delete: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    width: '100%',
   },
   eventButtons: {
     flexDirection: 'row',
@@ -786,8 +829,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginHorizontal: 8,
     marginTop: 8,
-    width: '12%',
-    backgroundColor: '#007aff',
+    width: 80,
+    backgroundColor: '#FFC107',
   },
   TextEdit: {
     fontSize: 16,
@@ -797,19 +840,19 @@ const styles = StyleSheet.create({
   },
   TextDelete: {
     fontSize: 16,
-    color: '#444',
-    color: '#fff',
+    color: '#555',
+    fontFamily: 'Roboto-Bold',
+    fontWeight: '500',
   },
   deleteButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
     borderRadius: 8,
-    borderWidth: 1,
-    paddingVertical: 8,
-    marginHorizontal: 8,
-    marginTop: 8,
-    width: '12%',
-    backgroundColor: '#FE4646',
+    marginRight: -13,
+    height: 25,
+    width: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+    backgroundColor: '#ddd',
   },
   addButton: {
     marginVertical: 5,
@@ -818,68 +861,96 @@ const styles = StyleSheet.create({
     height: 40,
     color: '#fff',
     backgroundColor: '#007aff',
-    borderRadius: 8,
+    borderRadius: 10,
+    fontFamily: 'Nunito-Medium',
+    width: '50%',
+    margin: 10,
   },
-  closeButton: {
-    marginVertical: 5,
+  addButtonclientlist: {
     justifyContent: 'center',
     alignItems: 'center',
-    top: -5,
-    left: 326,
     height: 40,
-    width: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
+    color: '#fff',
+    borderColor: '#007aff',
+    borderWidth: 2,
+    borderRadius: 10,
+    width: '50%',
+    margin: 10,
+  },
+  closeButton: {
     borderRadius: 8,
-    elevation: 5,
+    height: 25,
+    width: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+    backgroundColor: '#ddd',
   },
   btnAddEvent: {
     justifyContent: 'center',
     alignItems: 'center',
-    bottom: 16,
-    right: -850,
-    width: 60,
-    height: 60,
-    borderRadius: 50,
+    width: 150,
+    height: 48,
+    borderRadius: 40,
     backgroundColor: '#007aff',
+    marginBottom: 20,
+  },
+  LogOut: {
+    paddingTop: 45,
+    width: 150,
+    height: 48,
+    borderRadius: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
+  btnAddEventText: {
+    fontFamily: 'Nunito-Medium',
+    fontSize: 15,
     color: '#fff',
   },
   modalContainer: {
+    justifyContent: 'space-evenly',
     padding: 16,
     backgroundColor: 'white',
     position: 'absolute',
-    bottom: 16,
-    right: 0,
-    elevation: 5,
-    borderRadius: 8,
+    bottom: 0,
+    left: 0,
+    borderRadius: 16,
     borderColor: '#ddd',
     borderWidth: 1,
-    width: 400,
+    width: '100%',
+    height: '100%',
+  },
+  modalbuttons: {
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    flexDirection: 'row',
+    width: '100%',
+    height: 48,
+    paddingLeft: 10,
+    paddingRight: 10,
   },
   input: {
     marginBottom: 8,
     backgroundColor: '#f0f0f0',
     color: '#000',
-    padding: 10,
     borderRadius: 8,
+    height: 40,
+    padding: 10, // Ajusta según sea necesario
   },
   clientListContainer: {
-    bottom: 16,
-    right: -150,
     padding: 16,
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 16,
     borderColor: '#ddd',
     borderWidth: 1,
-    width: 300,
-    height: 510,
+    width: '100%',
+    height: '100%',
   },
   closeClientButton: {
-    position: 'absolute',
-    top: 16,
-    right: 18,
-    height: 30,
-    width: 30,
+    borderRadius: 8,
+    height: 25,
+    width: 25,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 15,
@@ -891,6 +962,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     left: 14,
+    fontFamily: 'Nunito-Medium',
   },
   clientListScrollView: {
     marginBottom: 0,
@@ -898,7 +970,7 @@ const styles = StyleSheet.create({
   clientListItem: {
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderColor: '#ddd',
   },
   clientListItemText: {
     fontSize: 16,

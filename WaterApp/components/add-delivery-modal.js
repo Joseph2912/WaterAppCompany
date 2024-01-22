@@ -5,16 +5,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from 'react-native';
-import {Button} from 'react-native-paper';
 import {db} from '../firebase/firebase-config';
 import {
   onSnapshot,
   collection,
-  addDoc,
   Timestamp,
   doc,
   setDoc,
+  getDoc,
 } from 'firebase/firestore';
 
 function AddDeliveryModal({
@@ -43,13 +43,21 @@ function AddDeliveryModal({
 
   const handleClientSelect = async client => {
     try {
+      // Verificar si el cliente ya está asignado
+      if (client.conductorAsignado) {
+        Alert.alert(
+          'Cliente ya asignado',
+          'Este cliente ya está asignado a otro conductor.',
+        );
+        return;
+      }
+
       const driverId = driverInfo.id;
       const driverDeliveryRef = collection(db, 'User', driverId, 'delivery');
 
       const newDeliveryDoc = await setDoc(
         doc(driverDeliveryRef, client.Phone),
         {
-          Id: client.id,
           name: client.Name,
           Phone: client.Phone,
           Address: client.Address,
@@ -61,11 +69,47 @@ function AddDeliveryModal({
 
       console.log('Delivery added successfully');
 
+      // Actualizar el cliente para indicar que está asignado
+      const clientsRef = collection(db, 'Clients');
+      const clientDocRef = doc(clientsRef, client.Phone);
+
+      // Verificar si el documento ya existe en la colección 'Clients'
+      const clientDocSnapshot = await getDoc(clientDocRef);
+
+      if (clientDocSnapshot.exists()) {
+        // El documento existe, entonces puedes actualizarlo
+        await setDoc(clientDocRef, {
+          ...client,
+          conductorAsignado: driverId,
+        });
+
+        console.log('Client assigned successfully');
+      } else {
+        console.log('Client document does not exist');
+        // Aquí puedes manejar el caso donde el documento no existe si es necesario
+      }
+
       onClientSelect(client);
       onAddDelivery();
       onClose();
     } catch (error) {
       console.error('Error adding delivery:', error);
+    }
+  };
+
+  const handleClientDesasign = async client => {
+    try {
+      const clientsRef = collection(db, 'Clients');
+      await setDoc(doc(clientsRef, client.id), {
+        ...client,
+        conductorAsignado: null, // Desasignar al conductor
+      });
+
+      // Puedes realizar otras acciones necesarias aquí
+
+      console.log('Client desassigned successfully');
+    } catch (error) {
+      console.error('Error desassigning client:', error);
     }
   };
 
@@ -83,14 +127,18 @@ function AddDeliveryModal({
               handleClientSelect(client);
               onClose();
             }}
+            onLongPress={() => {
+              handleClientDesasign(client);
+              onClose();
+            }}
             style={styles.clientListItem}>
             <Text style={styles.clientListItemText}>{client.Name}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
-      <Button onPress={onClose} style={styles.closeButton}>
-        Close
-      </Button>
+      <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+        <Text style={styles.closeButtonText}>Close</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -103,12 +151,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 30,
     borderRadius: 10,
+    height: 500,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#000',
+    color: '#333',
   },
   clientListScrollView: {
     flex: 1,
@@ -125,7 +174,18 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   closeButton: {
-    marginTop: 20,
+    marginTop: 40,
+    borderColor: '#007aff',
+    borderWidth: 1,
+    borderRadius: 12,
+    height: 35,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#007aff',
+    fontSize: 15,
   },
 });
 

@@ -1,9 +1,10 @@
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
-import React, {useEffect} from 'react';
+import React from 'react';
 import {getAuth, onAuthStateChanged, signOut} from 'firebase/auth';
 import {doc, updateDoc} from 'firebase/firestore';
 import {useNavigation} from '@react-navigation/native';
 import {db} from './firebase-config';
+import Icon from 'react-native-vector-icons/SimpleLineIcons';
 
 function LogOut() {
   const auth = getAuth();
@@ -12,13 +13,10 @@ function LogOut() {
   const handleLogout = async () => {
     const user = auth.currentUser;
 
-    // Verifica si el usuario está autenticado antes de proceder
     if (user) {
       try {
-        // Cerrar sesión
         await signOut(auth);
 
-        // Actualizar el estado del documento en Firestore
         const userDocRef = doc(db, 'User', user.uid);
         await updateDoc(userDocRef, {
           estado: 'inactivo',
@@ -38,7 +36,7 @@ function LogOut() {
   };
 
   return (
-    <View>
+    <View style={styles.container}>
       <TouchableOpacity
         style={styles.button}
         onPress={() => {
@@ -50,20 +48,29 @@ function LogOut() {
   );
 }
 
-export default LogOut;
-
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    marginBottom: 20, //
+  },
   button: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
     height: 40,
-    alignItems: 'left',
-    justifyContent: 'left',
     width: 'auto',
     padding: 8,
   },
   buttonText: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: 'light',
-    left: 10,
+    fontFamily: 'Nunito-Medium',
+    color: '#333',
+    fontSize: 15,
+    marginLeft: 40,
+  },
+  ico: {
+    marginLeft: 10,
+    color: '#333',
   },
 });
+
+export default LogOut;

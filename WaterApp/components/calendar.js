@@ -136,8 +136,6 @@ export default function Calendar() {
     };
   }, [showClientList]);
 
-  // Generates a matrix of dates for three weeks centered around the current week.
-  // Generates a matrix of dates for three weeks centered around the current week.
   const weeks = React.useMemo(() => {
     const start = moment().add(week, 'weeks').startOf('week');
 

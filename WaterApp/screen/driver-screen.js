@@ -1,11 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, SafeAreaView, TouchableOpacity, FlatList, View, Linking, Alert } from 'react-native';
+/*import React, {useState, useEffect} from 'react';
+import {
+  StyleSheet,
+  Text,
+  SafeAreaView,
+  TouchableOpacity,
+  FlatList,
+  View,
+  Linking,
+  Alert,
+} from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { updateDoc, doc, collection, query, where, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
-import { signOut, getAuth } from 'firebase/auth';
-import { db } from '../firebase/firebase-config';
+import {
+  updateDoc,
+  doc,
+  collection,
+  query,
+  getDocs,
+  deleteDoc,
+  getDoc,
+} from 'firebase/firestore';
+import {getAuth} from 'firebase/auth';
+import {db} from '../firebase/firebase-config';
+import Icon from 'react-native-vector-icons/Feather';
 
-const Test = ({ navigation }) => {
+const DriverScreen = ({navigation}) => {
   const auth = getAuth();
   const [position, setPosition] = useState({
     latitude: null,
@@ -15,6 +33,7 @@ const Test = ({ navigation }) => {
   });
   const [deliveries, setDeliveries] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [locationObtained, setLocationObtained] = useState(false);
 
   useEffect(() => {
     const fetchDeliveries = async () => {
@@ -22,7 +41,7 @@ const Test = ({ navigation }) => {
         const userRef = doc(db, 'User', auth.currentUser.uid);
         const deliveriesQuery = query(collection(userRef, 'delivery'));
         const querySnapshot = await getDocs(deliveriesQuery);
-        const deliveriesData = querySnapshot.docs.map((doc) => ({
+        const deliveriesData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         }));
@@ -30,72 +49,87 @@ const Test = ({ navigation }) => {
       } catch (error) {
         console.error('Error fetching deliveries:', error);
       } finally {
-        // Después de cargar las entregas, detenemos la animación de actualización
         setRefreshing(false);
       }
     };
 
     fetchDeliveries();
 
-    const updateLocation = async (pos) => {
+    const updateLocation = async pos => {
       const crd = pos.coords;
-      setPosition({
-        latitude: crd.latitude,
-        longitude: crd.longitude,
-        latitudeDelta: 0.0421,
-        longitudeDelta: 0.0421,
-      });
 
-      // Guardar la ubicación en Firestore
-      try {
-        const userRef = doc(db, 'User', auth.currentUser.uid);
-        await updateDoc(userRef, {
-          latitude: crd.latitude,
-          longitude: crd.longitude,
-        });
-      } catch (error) {
-        console.error('Error updating location in Firestore:', error);
+      // Calcular la distancia entre la ubicación actual y la última conocida
+      const distance = calculateDistance(
+        position.latitude,
+        position.longitude,
+        crd.latitude,
+        crd.longitude,
+      );
+
+      if (distance >= 10) {
+        // Actualizar si la distancia es mayor o igual a 10 metros
+        try {
+          const userRef = doc(db, 'User', auth.currentUser.uid);
+          await updateDoc(userRef, {
+            latitude: crd.latitude,
+            longitude: crd.longitude,
+          });
+
+          setPosition({
+            latitude: crd.latitude,
+            longitude: crd.longitude,
+            latitudeDelta: 0.0421,
+            longitudeDelta: 0.0421,
+          });
+
+          setLocationObtained(true);
+        } catch (error) {
+          console.error('Error updating location in Firestore:', error);
+          setLocationObtained(true);
+        }
       }
     };
 
-    const watchId = Geolocation.getCurrentPosition(
+    const watchId = Geolocation.watchPosition(
       updateLocation,
-      (err) => {
-        console.log(err);
+      err => {
+        console.error(err);
+        setLocationObtained(true);
       },
-      { enableHighAccuracy: true, distanceFilter: 10 }
+      {enableHighAccuracy: true, distanceFilter: 10},
     );
 
     return () => {
       Geolocation.clearWatch(watchId);
     };
-  }, [auth, refreshing]);
+  }, [auth, refreshing, position]);
 
-  const handleLogout = async () => {
-    try {
-      // Actualizar el campo 'estado' a 'inactivo'
-      const userRef = doc(db, 'User', auth.currentUser.uid);
-      await updateDoc(userRef, { estado: 'inactivo' });
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) *
+        Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
 
-      await signOut(auth);
-      navigation.navigate('Login');
-      console.log('Logout successful');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    } catch (error) {
-      console.error('Error when logging out:', error);
-    }
+    return distance * 1000;
   };
 
-  const deleteDeliveryFromConductor = async (deliveryId) => {
+  const deg2rad = deg => {
+    return deg * (Math.PI / 180);
+  };
+
+  const deleteDeliveryFromConductor = async deliveryId => {
     try {
       const userRef = doc(db, 'User', auth.currentUser.uid);
       const deliveryDocRef = doc(collection(userRef, 'delivery'), deliveryId);
       const deliveryData = (await getDoc(deliveryDocRef)).data();
 
-      // Mostrar alerta de confirmación antes de enviar el correo electrónico y eliminar
       Alert.alert(
         'Confirmation',
         'Are you sure you have completed the delivery?',
@@ -107,18 +141,15 @@ const Test = ({ navigation }) => {
           {
             text: 'Yes',
             onPress: async () => {
-              // Enviar el correo electrónico
               await sendEmail(deliveryData);
 
-              // Eliminar el pedido
               await deleteDoc(deliveryDocRef);
 
-              // Vuelve a cargar la lista de entregas (sin necesidad de la función fetchDeliveries)
               try {
                 const userRef = doc(db, 'User', auth.currentUser.uid);
                 const deliveriesQuery = query(collection(userRef, 'delivery'));
                 const querySnapshot = await getDocs(deliveriesQuery);
-                const deliveriesData = querySnapshot.docs.map((doc) => ({
+                const deliveriesData = querySnapshot.docs.map(doc => ({
                   id: doc.id,
                   ...doc.data(),
                 }));
@@ -129,14 +160,14 @@ const Test = ({ navigation }) => {
             },
           },
         ],
-        { cancelable: false }
+        {cancelable: false},
       );
     } catch (error) {
       console.error('Error deleting delivery:', error);
     }
   };
 
-  const sendEmail = async (deliveryData) => {
+  const sendEmail = async deliveryData => {
     try {
       const email = 'joseph.marulanda@uao.edu.co';
       const subject = `Completed the delivery of ${deliveryData.name}`;
@@ -147,7 +178,9 @@ const Test = ({ navigation }) => {
         Neighborhood: ${deliveryData.neighborhood}
         Description: ${deliveryData.description}`;
 
-      const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(
+        subject,
+      )}&body=${encodeURIComponent(body)}`;
       await Linking.openURL(mailtoLink);
     } catch (error) {
       console.error('Error sending email:', error);
@@ -156,72 +189,86 @@ const Test = ({ navigation }) => {
 
   const handleRefresh = async () => {
     try {
-      // Iniciar la animación de actualización
       setRefreshing(true);
 
-      // Vuelve a cargar la lista de entregas
       try {
         const userRef = doc(db, 'User', auth.currentUser.uid);
         const deliveriesQuery = query(collection(userRef, 'delivery'));
         const querySnapshot = await getDocs(deliveriesQuery);
-        const deliveriesData = querySnapshot.docs.map((doc) => ({
+        const deliveriesData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         }));
         setDeliveries(deliveriesData);
-
-        // Muestra un mensaje o alerta indicando que la lista se ha actualizado correctamente
-        Alert.alert('Refreshed', 'Delivery list updated successfully');
       } catch (error) {
         console.error('Error fetching deliveries:', error);
       } finally {
-        // Después de cargar las entregas, detenemos la animación de actualización
         setRefreshing(false);
       }
     } catch (error) {
       console.error('Error refreshing deliveries:', error);
     } finally {
-      // Después de cargar las entregas, detenemos la animación de actualización
       setRefreshing(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity
+        style={styles.menu}
+        onPress={() => navigation.openDrawer()}>
+        <Icon name="menu" size={30} color="black" />
+      </TouchableOpacity>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Delivery Details</Text>
+        <Text style={styles.headertittle}>All Deliveries</Text>
+        <TouchableOpacity
+          style={styles.map}
+          onPress={() => navigation.navigate('MapScreen')}>
+          <Icon name="map-pin" size={20} color="white" />
+        </TouchableOpacity>
       </View>
-      {position.latitude !== null && position.longitude !== null && (
-        <View style={styles.locationInfo}>
-          <Text style={styles.locationText}>Latitude: {position.latitude}</Text>
-          <Text style={styles.locationText}>Longitude: {position.longitude}</Text>
-        </View>
-      )}
-   <FlatList
+      <View style={styles.headertext}>
+        <Text style={styles.Text}>Here you can see all your deliveries.</Text>
+      </View>
+      <FlatList
         data={deliveries}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
+        keyExtractor={item => item.id}
+        renderItem={({item}) => (
           <View key={item.id} style={styles.deliveryContainer}>
-            <Text style={styles.deliveryTitle}>Delivery ID: {item.id}</Text>
-            <Text style={styles.deliveryText}>Name: {item.name}</Text>
-            <Text style={styles.deliveryText}>Phone: {item.Phone}</Text>
-            <Text style={styles.deliveryText}>Address: {item.Address}</Text>
-            <Text style={styles.deliveryText}>Neighborhood: {item.neighborhood}</Text>
-            <Text style={styles.deliveryText}>Description: {item.description}</Text>
+            <View style={styles.idcontainer}>
+              <Text style={styles.deliveryTitle}>DELIVERY ID:</Text>
+              <Text style={styles.deliveryinfoid}># {item.id}</Text>
+            </View>
+            <View style={styles.infocontainer}>
+              <Text style={styles.deliveryText}>NAME </Text>
+              <Text style={styles.deliveryinfo}>{item.name}</Text>
+            </View>
+            <View style={styles.infocontainer}>
+              <Text style={styles.deliveryText}>PHONE </Text>
+              <Text style={styles.deliveryinfo}>{item.Phone}</Text>
+            </View>
+            <View style={styles.infocontainer}>
+              <Text style={styles.deliveryText}>ADDRESS</Text>
+              <Text style={styles.deliveryinfo}>{item.Address}</Text>
+            </View>
+            <View style={styles.infocontainer}>
+              <Text style={styles.deliveryText}>NEIGHBORHOOD</Text>
+              <Text style={styles.deliveryinfo}> {item.neighborhood}</Text>
+            </View>
+            <View style={styles.infocontainer}>
+              <Text style={styles.deliveryText}>COMMENT:</Text>
+              <Text style={styles.deliveryinfo}>{item.description}</Text>
+            </View>
             <TouchableOpacity
               style={styles.emailButton}
-              onPress={() => deleteDeliveryFromConductor(item.id)}
-            >
-              <Text style={styles.emailButtonText}>Enviar Email y Eliminar</Text>
+              onPress={() => deleteDeliveryFromConductor(item.id)}>
+              <Text style={styles.emailButtonText}>DELIVERED</Text>
             </TouchableOpacity>
           </View>
         )}
         refreshing={refreshing}
         onRefresh={handleRefresh}
       />
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Log Out</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -233,15 +280,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
-    backgroundColor: '#3498db',
-    paddingVertical: 10,
+    padding: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headertittle: {
+    color: '#333',
+    fontSize: 28,
+    fontFamily: 'Roboto-Bold',
+  },
+  map: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
+    backgroundColor: '#007aff',
+    height: 40,
+    width: 40,
+  },
+  headertext: {
+    padding: 10,
     marginBottom: 20,
   },
-  headerText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  idcontainer: {
+    flexDirection: 'row',
+    padding: 10,
+    justifyContent: 'space-between',
+  },
+  infocontainer: {
+    padding: 10,
+    justifyContent: 'space-between',
+  },
+  Text: {
+    color: '#777',
+    fontSize: 17,
+    textAlign: 'left',
+    fontFamily: 'Nunito-Medium',
+  },
+  menu: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    borderRadius: 10,
+    height: 50,
+    width: 50,
+    backgroundColor: '#eee',
+  },
+  deliveryinfoid: {
+    color: '#333',
+    fontSize: 14,
+    fontFamily: 'Nunito-Medium',
+  },
+  deliveryinfo: {
+    color: '#333',
+    fontSize: 17,
+    fontFamily: 'Nunito-Medium',
   },
   locationInfo: {
     marginBottom: 20,
@@ -252,33 +345,38 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   deliveryContainer: {
-    backgroundColor: '#ecf0f1',
     padding: 15,
+    borderWidth: 1.5,
+    borderColor: '#ddd',
     borderRadius: 10,
     marginBottom: 15,
   },
   deliveryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#3498db',
+    fontSize: 14,
+    fontFamily: 'Roboto-Bold',
+    color: '#999',
     marginBottom: 10,
   },
   deliveryText: {
-    fontSize: 16,
-    color: '#000',
+    fontFamily: 'Roboto-Bold',
+    fontSize: 14,
+    color: '#999',
     marginBottom: 5,
   },
   emailButton: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: '#007aff',
     padding: 10,
-    borderRadius: 5,
+    borderRadius: 8,
+    justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
+    marginBottom: 10,
+    height: 48,
   },
   emailButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontFamily: 'Nunito-Medium',
   },
   logoutButton: {
     backgroundColor: '#000',
@@ -287,11 +385,12 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   logoutButtonText: {
+    fontFamily: 'Nunito-Medium',
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
     textAlign: 'center',
   },
 });
 
-export default Test;
+export default DriverScreen;
+*/

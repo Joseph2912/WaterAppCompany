@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet,TouchableOpacity } from 'react-native';
 import { Card, Button } from 'react-native-paper';
 import AddDeliveryModal from './add-delivery-modal';
 import DeleteDeliveryModal from './delete-delivery-modal'; 
@@ -40,32 +40,30 @@ function DriverModal({
   return (
     <View style={styles.modalContainer}>
       {!addDeliveryModalVisible && !deleteDeliveryModalVisible ? (
-        <Card>
-          <Card.Content>
+          <View style={styles.modalContainer2}>
             <Text style={styles.modalTitle}>{driverInfo?.name}</Text>
             <View style={styles.modalDeliveryContainer}></View>
-            <Button
+            <TouchableOpacity
               mode="contained"
               onPress={handleAddDelivery}
-              style={styles.Button}
+              style={styles.Buttonadd}
             >
-              Add Delivery
-            </Button>
-            <Button
+              <Text style={styles.detailsButtonText2}>Add Delivery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               mode="contained"
               onPress={handleDeleteDelivery}
-              style={styles.Button}
+              style={styles.Buttonremove}
             >
-              Remove Delivery
-            </Button>
-            <Button onPress={handleDetails} style={styles.detailsButton}>
-              Details
-            </Button>
-            <Button onPress={onClose} style={styles.Buttonclose}>
-              Close
-            </Button>
-          </Card.Content>
-        </Card>
+             <Text style={styles.detailsButtonText2}>Remove Delivery</Text> 
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDetails} style={styles.detailsButton}>
+            <Text style={styles.detailsButtonText}>  Details</Text> 
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose} style={styles.Buttonclose}>
+              <Text style={styles.ButtoncloseText}>Close</Text>
+            </TouchableOpacity>
+            </View>
       ) : addDeliveryModalVisible ? (
         <AddDeliveryModal
           isVisible={addDeliveryModalVisible}
@@ -97,42 +95,91 @@ function DriverModal({
 
 const styles = StyleSheet.create({
   modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
+    flex:1,
+    position:'absolute',
     padding: 10,
     backgroundColor: 'white',
-    position: 'absolute',
-    bottom: 16,
+    justifyContent: 'center',
+    alignContent: 'center',
+    top: 0,
     right: 0,
-    elevation: 5,
-    borderRadius: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
     borderColor: '#ddd',
     borderWidth: 1,
-    width: 321,
+    width: '100%',
     height: 'auto',
   },
-  Button: {
+  modalContainer2: {
+    backgroundColor: 'white',
+    padding: 10
+
+  },
+  Buttonadd: {
+    backgroundColor: '#007aff',
     margin: 5,
+    borderRadius:12,
+    width: '100%',
+    height: 38,
+    justifyContent:'center',
+    alignItems:'center'
+
+  },
+  Buttonremove: {
+    backgroundColor: 'red',
+    margin: 5,
+    borderRadius:12,
+    width: '100%',
+    height: 38,
+    justifyContent:'center',
+    alignItems:'center'
   },
   Buttonclose: {
     margin: 5,
-    borderWidth: 0.5,
-    borderColor: 'purple',
+    borderColor: '#007aff',
+    borderWidth: 1,
+    borderRadius:12,
+    height:35,
+    width: '100%',
+    justifyContent:'center',
+    alignItems:'center'
+  },
+  detailsButton: {
+    margin: 5,
+    borderColor: '#007aff',
+    borderWidth: 1,
+    borderRadius:12,
+    height:35,
+    width: '100%',
+    justifyContent:'center',
+    alignItems:'center'
+  },
+  detailsButtonText: {
+    color: '#007aff',
+    fontSize: 14
+  },
+  detailsButtonText2: {
+    color: '#fff',
+    fontSize: 14
+  },
+  ButtoncloseText: {
+    color: '#007aff',
+    fontSize: 14
   },
   modalTitle: {
-    fontSize: 16,
+    marginLeft:13,
+    fontFamily: 'Roboto-Bold',
+    fontSize: 20,
     color: '#444',
     fontWeight: 'bold',
   },
-  modalSubtitle: {
-    fontSize: 16,
-    color: '#000',
-  },
   modalDeliveryTitle: {
+    fontFamily: 'Nunito-Medium',
     fontSize: 16,
     color: '#000',
   },
   modalDeliveryContainer: {
+    fontFamily: 'Nunito-Medium',
     fontSize: 16,
     color: '#000',
     marginBottom: 15,

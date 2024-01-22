@@ -4,7 +4,6 @@ import {db} from './firebase-config';
 import {Alert} from 'react-native';
 
 const doLogin = async (auth, email, password, navigation) => {
-  // Validation of the form
   if (!email.endsWith('@gmail.com') && !email.endsWith('@hotmail.com')) {
     Alert.alert('Please verify that your email address is written correctly');
     // return;
@@ -15,20 +14,17 @@ const doLogin = async (auth, email, password, navigation) => {
     Alert.alert('The password must be at least 6 characters');
     // return;
   }
-  // Log in using Firebase Auth
+
   try {
     const login = await signInWithEmailAndPassword(auth, email, password);
     const user = login.user;
 
-    // Check if email is verified
     if (user.emailVerified) {
       const uid = user.uid;
 
-      // Get the user document from Firestore
       const userDocRef = doc(db, 'User', uid);
       const userDocSnapshot = await getDoc(userDocRef);
       if (userDocSnapshot.exists()) {
-        // Get the role of the user
         const rol = userDocSnapshot.data().Rol;
         console.log(`Successful login. Role of the user: ${rol}`);
         if (rol === 0) {
@@ -40,7 +36,7 @@ const doLogin = async (auth, email, password, navigation) => {
           try {
             const clientDocRef = doc(db, 'User', uid);
             await updateDoc(clientDocRef, {
-              estado: 'activo',
+              state: 'active',
             });
             console.log('Client updated in Firestore');
           } catch (error) {

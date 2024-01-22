@@ -14,6 +14,13 @@
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
 		7699B88040F8A987B510C191 /* libPods-WaterApp-WaterAppTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 19F6CBCC0A4E27FBF8BF4A61 /* libPods-WaterApp-WaterAppTests.a */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		B03992E952F24E099093FAA1 /* ComicNeue.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EB96A432F106436697AFC40D /* ComicNeue.ttf */; };
+		50205A531355454EB27285DB /* Nunito-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F1F9BC33D9D749C487A21FE2 /* Nunito-ExtraBold.ttf */; };
+		9EBF833F65B04EE29D868398 /* Nunito-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9ECC5522DC6945E2A674050F /* Nunito-Medium.ttf */; };
+		3E3AA1B11481445E8DACEE18 /* Roboto-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAD5C7DB89E64A18B857868F /* Roboto-Black.ttf */; };
+		3174676FCFAE453285CD32B0 /* Roboto-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B4E369E25E134ED48ABBB0B3 /* Roboto-Bold.ttf */; };
+		9880E5565D0845A9B180B9C5 /* Roboto-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A7F376A6FFE5470A8DC5CA12 /* Roboto-Medium.ttf */; };
+		13F2709128C649E5864EF9A2 /* Roboto-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2E62077A78544D3599EB33C2 /* Roboto-Regular.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +51,13 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = WaterApp/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		89C6BE57DB24E9ADA2F236DE /* Pods-WaterApp-WaterAppTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WaterApp-WaterAppTests.release.xcconfig"; path = "Target Support Files/Pods-WaterApp-WaterAppTests/Pods-WaterApp-WaterAppTests.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		EB96A432F106436697AFC40D /* ComicNeue.ttf */ = {isa = PBXFileReference; name = "ComicNeue.ttf"; path = "../assets/fonts/ComicNeue.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		F1F9BC33D9D749C487A21FE2 /* Nunito-ExtraBold.ttf */ = {isa = PBXFileReference; name = "Nunito-ExtraBold.ttf"; path = "../assets/fonts/Nunito-ExtraBold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		9ECC5522DC6945E2A674050F /* Nunito-Medium.ttf */ = {isa = PBXFileReference; name = "Nunito-Medium.ttf"; path = "../assets/fonts/Nunito-Medium.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		FAD5C7DB89E64A18B857868F /* Roboto-Black.ttf */ = {isa = PBXFileReference; name = "Roboto-Black.ttf"; path = "../assets/fonts/Roboto-Black.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		B4E369E25E134ED48ABBB0B3 /* Roboto-Bold.ttf */ = {isa = PBXFileReference; name = "Roboto-Bold.ttf"; path = "../assets/fonts/Roboto-Bold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		A7F376A6FFE5470A8DC5CA12 /* Roboto-Medium.ttf */ = {isa = PBXFileReference; name = "Roboto-Medium.ttf"; path = "../assets/fonts/Roboto-Medium.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		2E62077A78544D3599EB33C2 /* Roboto-Regular.ttf */ = {isa = PBXFileReference; name = "Roboto-Regular.ttf"; path = "../assets/fonts/Roboto-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -122,6 +136,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				DACF30B6DE904CC58CE867C6 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -147,6 +162,21 @@
 			);
 			path = Pods;
 			sourceTree = "<group>";
+		};
+		DACF30B6DE904CC58CE867C6 /* Resources */ = {
+			isa = "PBXGroup";
+			children = (
+				EB96A432F106436697AFC40D /* ComicNeue.ttf */,
+				F1F9BC33D9D749C487A21FE2 /* Nunito-ExtraBold.ttf */,
+				9ECC5522DC6945E2A674050F /* Nunito-Medium.ttf */,
+				FAD5C7DB89E64A18B857868F /* Roboto-Black.ttf */,
+				B4E369E25E134ED48ABBB0B3 /* Roboto-Bold.ttf */,
+				A7F376A6FFE5470A8DC5CA12 /* Roboto-Medium.ttf */,
+				2E62077A78544D3599EB33C2 /* Roboto-Regular.ttf */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+			path = "";
 		};
 /* End PBXGroup section */
 
@@ -243,6 +273,13 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				B03992E952F24E099093FAA1 /* ComicNeue.ttf in Resources */,
+				50205A531355454EB27285DB /* Nunito-ExtraBold.ttf in Resources */,
+				9EBF833F65B04EE29D868398 /* Nunito-Medium.ttf in Resources */,
+				3E3AA1B11481445E8DACEE18 /* Roboto-Black.ttf in Resources */,
+				3174676FCFAE453285CD32B0 /* Roboto-Bold.ttf in Resources */,
+				9880E5565D0845A9B180B9C5 /* Roboto-Medium.ttf in Resources */,
+				13F2709128C649E5864EF9A2 /* Roboto-Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
