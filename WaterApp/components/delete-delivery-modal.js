@@ -12,21 +12,24 @@ import {
   deleteDoc,
   doc,
   updateDoc,
-  setDoc,
 } from 'firebase/firestore';
-import {FieldValue} from 'firebase/firestore';
 import {db} from '../firebase/firebase-config';
 
+// DeleteDeliveryModal component to delete deliveries for a driver
 function DeleteDeliveryModal({
   isVisible,
   onClose,
   driverInfo,
   onDeleteDelivery,
 }) {
+  // State to store the list of deliveries
   const [deliveryList, setDeliveryList] = useState([]);
+  // State to store the IDs of selected deliveries to delete
   const [selectedDeliveries, setSelectedDeliveries] = useState([]);
+  // State to store the list of selected clients
   const [selectedClients, setSelectedClients] = useState([]);
 
+  // Fetch deliveries when the modal becomes visible
   useEffect(() => {
     const fetchDeliveries = async () => {
       try {
@@ -54,8 +57,10 @@ function DeleteDeliveryModal({
     }
   }, [isVisible, driverInfo.id]);
 
+  // Handle the deletion of selected deliveries
   const handleDeleteDeliveries = async () => {
     try {
+      // Use promises to delete each selected delivery
       const updatePromises = selectedDeliveries.map(async deliveryId => {
         const deliveryRef = doc(
           db,
@@ -66,19 +71,15 @@ function DeleteDeliveryModal({
         );
         await deleteDoc(deliveryRef);
 
-        // Desasigna el cliente y almacena su información en el estado
+        // Unassign the client and update their information
         try {
           const clientsRef = collection(db, 'Clients');
-
-          // Utiliza el número de teléfono como nombre del documento en la colección "Clients"
           const phoneNumber = deliveryId;
-
-          // Construye la referencia al documento en la colección "Clients" con el número de teléfono
           const clientDocRef = doc(clientsRef, phoneNumber);
 
-          // Actualiza el documento en la colección "Clients" eliminando el campo "conductorAsignado" e "id"
           await updateDoc(clientDocRef, {
             conductorAsignado: '',
+            driverName: '',
           });
 
           console.log('Client fields deleted successfully');
@@ -87,12 +88,13 @@ function DeleteDeliveryModal({
         }
       });
 
+      // Wait for all promises to resolve
       await Promise.all(updatePromises);
 
-      // Llama a la función onDeleteDelivery con los IDs de los deliveries eliminados
+      // Call onDeleteDelivery function with the IDs of the deleted deliveries
       onDeleteDelivery(selectedDeliveries);
 
-      // Cierra el modal
+      // Close the modal
       onClose();
     } catch (error) {
       console.error('Error deleting deliveries:', error);
@@ -103,17 +105,18 @@ function DeleteDeliveryModal({
     <View style={styles.modalContainer}>
       <Text style={styles.modalTitle}>Select deliveries to delete:</Text>
       <ScrollView style={styles.deliveryListScrollView}>
+        {/* Render the list of deliveries */}
         {deliveryList.map(delivery => (
           <TouchableOpacity
             key={delivery.id}
             onPress={() => {
-              // Actualiza la lista de deliveries seleccionados
+              // Update the list of selected deliveries
               setSelectedDeliveries(prevSelected =>
                 prevSelected.includes(delivery.id)
                   ? prevSelected.filter(id => id !== delivery.id)
                   : [...prevSelected, delivery.id],
               );
-              // Actualiza la lista de clientes seleccionados
+              // Update the list of selected clients
               setSelectedClients(prevSelected =>
                 prevSelected.filter(client => client.id !== delivery.id),
               );
@@ -132,17 +135,21 @@ function DeleteDeliveryModal({
           </TouchableOpacity>
         ))}
       </ScrollView>
+      {/* Button to delete selected deliveries */}
       <TouchableOpacity
         onPress={handleDeleteDeliveries}
         style={styles.deleteButton}>
         <Text>Delete Selected Deliveries</Text>
       </TouchableOpacity>
+      {/* Button to close the modal */}
       <TouchableOpacity onPress={onClose} style={styles.closeButton}>
         <Text style={styles.closeButtonText}>Close</Text>
       </TouchableOpacity>
     </View>
   );
 }
+
+// Styles for the DeleteDeliveryModal component
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
@@ -208,4 +215,5 @@ const styles = StyleSheet.create({
   },
 });
 
+// Export the DeleteDeliveryModal component
 export default DeleteDeliveryModal;

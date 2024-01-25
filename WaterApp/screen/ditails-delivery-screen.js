@@ -71,49 +71,39 @@ const DriverDetailsScreen = ({route}) => {
       )}
       <View style={styles.container2}>
         <View style={styles.details2}>
-              <View style={styles.header}>
-                <Paragraph style={styles.text2}>{driverInfo.name}</Paragraph>
-                <Button
-                  style={styles.button}
-                  labelStyle={styles.buttonText}
-                  mode="contained"
-                  onPress={() =>
-                    openExternalMap(driverLocation, 'Driver Location')
-                  }>
-                  Open Map
-                </Button>
-              </View>
-              <Paragraph style={styles.text4}>{driverInfo.email}</Paragraph>
-        <Title style={styles.sectionTitle}>Deliveries</Title>
+          <View style={styles.header}>
+            <Paragraph style={styles.text2}>{driverInfo.name}</Paragraph>
+            <Button
+              style={styles.button}
+              labelStyle={styles.buttonText}
+              mode="contained"
+              onPress={() =>
+                openExternalMap(driverLocation, 'Driver Location')
+              }>
+              Open Map
+            </Button>
+          </View>
+          <Paragraph style={styles.text4}>{driverInfo.email}</Paragraph>
+          <Title style={styles.sectionTitle}>Deliveries</Title>
         </View>
         <ScrollView style={styles.details}>
           {deliveryDetails.map((delivery, index) => (
             <Card key={index} style={styles.card}>
               <Card.Content>
-              <View style={styles.idcontainer}>
-                <Title style={styles.deliveryTitle}>DELIVERY </Title>
-                <Title style={styles.text3}>{`${
-                  index + 1
-                }`}</Title>
+                <View style={styles.idcontainer}>
+                  <Title style={styles.deliveryTitle}>DELIVERY </Title>
+                  <Title style={styles.text3}>{`${index + 1}`}</Title>
                 </View>
-                <Paragraph style={styles.text}>
-                  NAME{' '}
+                <Paragraph style={styles.text}>NAME </Paragraph>
+                <Paragraph style={styles.text3}> {delivery.name}</Paragraph>
+                <Paragraph style={styles.text}>PHONE </Paragraph>
+                <Paragraph style={styles.text3}> {delivery.Phone}</Paragraph>
+                <Paragraph style={styles.text}>ADDRESS </Paragraph>
+                <Paragraph style={styles.text3}>{delivery.address}</Paragraph>
+                <Paragraph style={styles.text}>NEIGHBORHOOD </Paragraph>
+                <Paragraph style={styles.text3}>
+                  {delivery.neighborhood}
                 </Paragraph>
-                  <Paragraph style={styles.text3}> {delivery.name}</Paragraph>
-                <Paragraph style={styles.text}>
-                  PHONE{' '}
-                </Paragraph>
-                  <Paragraph style={styles.text3}> {delivery.Phone}</Paragraph>
-                <Paragraph style={styles.text}>
-                  ADDRESS{' '}
-                </Paragraph>
-                  <Paragraph style={styles.text3}>{delivery.address}</Paragraph>
-                <Paragraph style={styles.text}>
-                  NEIGHBORHOOD{' '}
-                </Paragraph>
-                  <Paragraph style={styles.text3}>
-                    {delivery.neighborhood}
-                  </Paragraph>
                 <Paragraph style={styles.text}>COMMENT</Paragraph>
                 <Paragraph style={styles.text3}>
                   {delivery.description}
@@ -131,7 +121,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#fff'
+    backgroundColor: '#fff',
   },
   container2: {
     flex: 1,
@@ -146,12 +136,11 @@ const styles = StyleSheet.create({
   details: {
     height: '100%',
     width: '100%',
-    
   },
   idcontainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%'
+    width: '100%',
   },
   details2: {
     width: '100%',
@@ -159,7 +148,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     paddingLeft: 20,
     borderBottomWidth: 2,
-    borderColor: '#ddd'
+    borderColor: '#ddd',
   },
   sectionTitle: {
     fontFamily: 'Roboto-Bold',
@@ -168,18 +157,17 @@ const styles = StyleSheet.create({
     marginTop: 15,
     color: '#000',
     marginBottom: 15,
-  
   },
   card: {
     marginTop: 10,
     marginLeft: 10,
     marginRight: 10,
     backgroundColor: '#fff',
-    elevation: 0 ,
+    elevation: 0,
     borderWidth: 0.5,
     borderColor: '#ddd',
     borderRadius: 10,
-    marginBottom: 10,   
+    marginBottom: 10,
   },
   card2: {
     marginTop: 20,
@@ -189,7 +177,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: '#999',
     backgroundColor: '#fff',
-    elevation: 0
+    elevation: 0,
   },
   deliveryTitle: {
     fontFamily: 'Roboto-Bold',

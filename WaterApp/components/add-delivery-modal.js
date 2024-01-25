@@ -81,6 +81,7 @@ function AddDeliveryModal({
         await setDoc(clientDocRef, {
           ...client,
           conductorAsignado: driverId,
+          driverName: driverInfo.name, // Agregar el nombre del conductor
         });
 
         console.log('Client assigned successfully');

@@ -9,7 +9,7 @@ import SignUp from '../screen/signup-screen';
 import Admin from '../screen/admin-screen';
 import DriverScreen from '../screen/driver-screen';
 import AdminDrivers from '../screen/admin-drivers-screen';
-import DriverDetailsScreen from '../screen/details-delivery-screen';
+import DriverDetailsScreen from '../screen/ditails-delivery-screen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Platform} from 'react-native';
 import ForgotPassword from '../screen/forgotPassword-screen';
