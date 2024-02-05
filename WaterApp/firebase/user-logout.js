@@ -19,11 +19,11 @@ function LogOut() {
 
         const userDocRef = doc(db, 'User', user.uid);
         await updateDoc(userDocRef, {
-          estado: 'inactivo',
+          state: 'inactive',
         });
 
         console.log('User updated in Firestore');
-        navigation.navigate('Login');
+        navigation.replace('Login');
         console.log('Logout successful');
         navigation.reset({
           index: 0,

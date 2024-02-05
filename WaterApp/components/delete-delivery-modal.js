@@ -60,6 +60,8 @@ function DeleteDeliveryModal({
   // Handle the deletion of selected deliveries
   const handleDeleteDeliveries = async () => {
     try {
+      // Close the modal
+      onClose();
       // Use promises to delete each selected delivery
       const updatePromises = selectedDeliveries.map(async deliveryId => {
         const deliveryRef = doc(
@@ -93,9 +95,6 @@ function DeleteDeliveryModal({
 
       // Call onDeleteDelivery function with the IDs of the deleted deliveries
       onDeleteDelivery(selectedDeliveries);
-
-      // Close the modal
-      onClose();
     } catch (error) {
       console.error('Error deleting deliveries:', error);
     }

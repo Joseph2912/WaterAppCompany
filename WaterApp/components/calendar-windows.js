@@ -20,7 +20,7 @@ import {
   updateDoc,
   setDoc,
   deleteDoc,
-  addDoc,
+  getDoc
 } from 'firebase/firestore';
 import {onSnapshot} from 'firebase/firestore';
 import {db} from '../firebase/firebase-config';
@@ -42,10 +42,16 @@ export default function CalendarWindows() {
   const [eventDesc, setEventDesc] = useState('');
   const [showClientList, setShowClientList] = useState(false);
   const [clients, setClients] = useState([]);
-  const [selectedClient, setSelectedClient] = useState({});
+  const [selectedDays, setSelectedDays] = useState([]);
+  const [selectedDaysClientList, setSelectedDaysClientList] = useState([]);
+  const [selectAllDaysClientList, setSelectAllDaysClientList] = useState(false);
+  const [selectAllDays, setSelectAllDays] = useState(false);
+  const [addedEvents, setAddedEvents] = useState([]);
   const scrollViewRef = useRef();
   const navigation = useNavigation();
+  const [isEditEnabled, setIsEditEnabled] = useState(false);
 
+  // Fetches events data from Firestore for all clients and organizes them by date
   useEffect(() => {
     const fetchEventsFromClients = async () => {
       try {
@@ -58,7 +64,6 @@ export default function CalendarWindows() {
           clientsSnapshot.docs.map(async clientDoc => {
             const clientData = clientDoc.data();
 
-            // Asegúrate de que clientData tenga la propiedad driverName
             const driverName = clientData.driverName || 'No Driver Assigned';
 
             const clientEventsCollectionRef = collection(clientDoc.ref, 'date');
@@ -79,7 +84,7 @@ export default function CalendarWindows() {
                 address: clientData.Address,
                 neighborhood: clientData.Neighborhood,
                 description: clientData.Description,
-                driverName: driverName, // Incluye el nombre del conductor en el objeto de evento
+                driverName,
               });
             });
           }),
@@ -92,11 +97,11 @@ export default function CalendarWindows() {
       }
     };
 
-    // Fetch events initially
     fetchEventsFromClients();
 
-    // Clear the interval when the component is unmounted
-    return () => {};
+    return () => {
+      // No cleanup necessary for this useEffect
+    };
   }, []);
 
   useEffect(() => {
@@ -138,8 +143,10 @@ export default function CalendarWindows() {
     };
   }, [showClientList]);
 
+  // Generates a memoized array representing the weeks surrounding the current week
   const weeks = React.useMemo(() => {
     const start = moment().add(week, 'weeks').startOf('week');
+
     return [-1, 0, 1].map(adj => {
       return Array.from({length: 7}).map((_, index) => {
         const date = moment(start).add(adj, 'week').add(index, 'day');
@@ -152,13 +159,9 @@ export default function CalendarWindows() {
     });
   }, [week]);
 
+  // Filters events to get those matching the selected date
   const getEventsForSelectedDate = () => {
-    return events.filter(event => {
-      return (
-        moment(event.date).format('YYYY-MM-DD') ===
-        moment(value).format('YYYY-MM-DD')
-      );
-    });
+    return events.filter(event => moment(event.date).isSame(value, 'day'));
   };
 
   const selectedDateEvents = getEventsForSelectedDate();
@@ -175,6 +178,272 @@ export default function CalendarWindows() {
     scrollViewRef.current.scrollTo({x: 0, animated: false});
   };
 
+  // Toggles the selection state for a specific day or 'All days'
+  const toggleDaySelection = day => {
+    if (day === 'All days') {
+      setSelectAllDays(!selectAllDays);
+      setSelectedDays(
+        selectAllDays
+          ? []
+          : [
+              'Sunday',
+              'Monday',
+              'Tuesday',
+              'Wednesday',
+              'Thursday',
+              'Friday',
+              'Saturday',
+            ],
+      );
+    } else {
+      const isSelected = selectedDays.includes(day);
+      setSelectedDays(
+        isSelected
+          ? selectedDays.filter(selectedDay => selectedDay !== day)
+          : [...selectedDays, day],
+      );
+    }
+  };
+
+  const renderDayButtons = () => {
+    const daysOfWeek = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
+
+    return (
+      <View
+        style={{
+          justifyContent: 'space-between',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          width: '100%',
+          paddingLeft: 5,
+          paddingRight: 5,
+          marginTop: 8,
+        }}>
+        {[...daysOfWeek, 'All days'].map(day => (
+          <TouchableOpacity
+            key={day}
+            onPress={() => toggleDaySelection(day)}
+            style={{
+              backgroundColor: selectedDays.includes(day) ? '#007aff' : 'gray',
+              padding: 10,
+              margin: 5,
+              borderRadius: 5,
+              flexDirection: 'row',
+              width: '10%',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+            <Text style={{color: 'white'}}>{day.slice(0, 3)}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  // Handles the addition of events for selected days
+  const handleAddEventForDays = async () => {
+    resetSelectedDays();
+    setShowAddModal(false);
+    const startDate = moment(value);
+  
+    if (startDate.isValid()) {
+      if (selectAllDays) {
+        handleAddEvent3();
+        return;
+      }
+  
+      if (selectedDays.length === 0) {
+        handleAddEvent2();
+        return;
+      } else {
+        for (let i = 0; i < 4; i++) {
+          const currentWeek = startDate.clone().add(i, 'weeks');
+  
+          for (const selectedDay of selectedDays) {
+            const currentDate = currentWeek.clone().day(selectedDay);
+  
+            // Verificar si la fecha actual es menor que la fecha seleccionada
+            if (moment().isBefore(currentDate)) {
+              const formattedDate = currentDate.toISOString().split('T')[0];
+              const documentName = `${eventPhone}_${formattedDate}_${i + 1}`;
+  
+              try {
+                const clientDocRef = doc(db, 'Clients', eventPhone);
+                const eventsCollectionRef = collection(clientDocRef, 'date');
+  
+                // Verificar si ya existe un evento con la misma clave
+                const existingEvent = await getDoc(doc(eventsCollectionRef, documentName));
+                if (existingEvent.exists()) {
+                  // Mostrar alerta indicando que el evento ya está agregado
+                  Alert.alert(
+                    'Duplicate Event',
+                    'This event already exists. Please choose a different date or time.',
+                  );
+                  return;
+                }
+  
+                const newEvent = {
+                  id: documentName,
+                  date: currentDate.toDate(),
+                  name: eventText || 'Name',
+                  phone: eventPhone || 'Phone',
+                  address: eventAddress || 'Address',
+                  neighborhood: eventNeighborhood || 'Neighborhood',
+                  description: eventDesc || 'Description',
+                };
+  
+                await setDoc(doc(eventsCollectionRef, documentName), newEvent);
+                console.log('Event added with ID: ', documentName);
+  
+                setEvents(prevEvents => [...prevEvents, newEvent]);
+              } catch (error) {
+                console.error('Error adding event to Firestore:', error);
+              }
+            }
+          }
+        }
+  
+        resetInputFieldsAndHideModal();
+        RegisterClients(
+          startDate,
+          eventText,
+          eventPhone,
+          eventAddress,
+          eventNeighborhood,
+          eventDesc,
+        );
+      }
+    }
+  };
+
+  const handleAddEvent2 = () => {
+    resetSelectedDays();
+    setShowAddModal(false);
+    const formattedDate = value.toISOString().split('T')[0];
+    const documentName = `${eventPhone}_${formattedDate}`;
+
+    if (value) {
+      const newEvent = {
+        id: documentName,
+        date: value,
+        name: eventText || 'Name',
+        phone: eventPhone || 'Phone',
+        address: eventAddress || 'Address',
+        neighborhood: eventNeighborhood || 'Neighborhood',
+        description: eventDesc || 'Description',
+      };
+
+      setEvents([...events, newEvent]);
+      resetInputFieldsAndHideModal();
+      RegisterClients(
+        value,
+        eventText,
+        eventPhone,
+        eventAddress,
+        eventNeighborhood,
+        eventDesc,
+      );
+    }
+  };
+
+  const RegisterClients3 = async (
+    startDate,
+    name,
+    phone,
+    address,
+    neighborhood,
+    description,
+  ) => {
+    try {
+      const clientDocRef = doc(db, 'Clients', phone);
+      await setDoc(clientDocRef, {
+        Name: name || 'Name',
+        Phone: phone || 'Phone',
+        Address: address || 'Address',
+        Neighborhood: neighborhood || 'Neighborhood',
+        Description: description || 'Description',
+      });
+
+      for (let i = 0; i < 30; i++) {
+        const currentDate = moment(startDate).add(i, 'days');
+        const formattedDate = currentDate.format('YYYY-MM-DD');
+        const documentName = `${phone}_${formattedDate}_${i + 1}`;
+
+        const event = {
+          date: currentDate.toDate(),
+          name: name || 'Name',
+          phone: phone || 'Phone',
+          address: address || 'Address',
+          neighborhood: neighborhood || 'Neighborhood',
+          description: description || 'Description',
+        };
+
+        const eventsCollectionRef = collection(clientDocRef, 'date');
+        await setDoc(doc(eventsCollectionRef, documentName), event);
+      }
+
+      console.log(
+        'Client and events successfully registered for the next 30 days',
+      );
+    } catch (error) {
+      console.error('Error registering client and events in Firestore', error);
+    }
+  };
+
+  const handleAddEvent3 = () => {
+    resetSelectedDays();
+    setShowAddModal(false);
+    const startDate = moment(value);
+
+    if (startDate.isValid()) {
+      for (let i = 0; i < 30; i++) {
+        const currentDate = startDate.clone().add(i, 'days');
+        const formattedDate = currentDate.toISOString().split('T')[0];
+        const documentName = `${eventPhone}_${formattedDate}_${i + 1}`;
+
+        const newEvent = {
+          id: documentName,
+          date: currentDate.toDate(),
+          name: eventText || 'Name',
+          phone: eventPhone || 'Phone',
+          address: eventAddress || 'Address',
+          neighborhood: eventNeighborhood || 'Neighborhood',
+          description: eventDesc || 'Description',
+        };
+
+        setEvents(prevEvents => [...prevEvents, newEvent]);
+      }
+
+      resetInputFieldsAndHideModal();
+      RegisterClients3(
+        startDate,
+        eventText,
+        eventPhone,
+        eventAddress,
+        eventNeighborhood,
+        eventDesc,
+      );
+    }
+  };
+
+  const resetInputFieldsAndHideModal = () => {
+    setEventText('');
+    setEventPhone('');
+    setEventAddress('');
+    setEventNeighborhood('');
+    setEventDesc('');
+    setShowAddModal(false);
+  };
+
   const handleEditEvent = event => {
     setEditedEvent(event);
     setEventText(event.name);
@@ -183,35 +452,7 @@ export default function CalendarWindows() {
     setEventNeighborhood(event.neighborhood);
     setEventDesc(event.description);
     setShowAddModal(true);
-  };
-
-  const handleDeleteEvent = async eventId => {
-    Alert.alert('Delete Event', 'Are you sure you want to delete this event?', [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-      {
-        text: 'Delete',
-        onPress: async () => {
-          try {
-            const eventToDelete = events.find(event => event.id === eventId);
-            if (!eventToDelete) {
-              console.error('Event not found');
-              return;
-            }
-            const clientDocRef = doc(db, 'Clients', eventToDelete.phone);
-            const eventsCollectionRef = collection(clientDocRef, 'date');
-            await deleteDoc(doc(eventsCollectionRef, eventId));
-            const updatedEvents = events.filter(event => event.id !== eventId);
-            setEvents(updatedEvents);
-          } catch (error) {
-            console.error('Error deleting event', error);
-          }
-        },
-        style: 'destructive',
-      },
-    ]);
+    setIsEditEnabled(true);
   };
 
   const saveEditedEvent = async () => {
@@ -247,283 +488,61 @@ export default function CalendarWindows() {
     }
   };
 
-  const [selectedDays, setSelectedDays] = useState([]);
-
-  const toggleDaySelection = day => {
-    if (day === 'All days') {
-      // Toggle para "All days"
-      setSelectAllDays(!selectAllDays);
-
-      if (!selectAllDays) {
-        // Si está seleccionado, agregar todos los días
-        setSelectedDays([
-          'Sunday',
-          'Monday',
-          'Tuesday',
-          'Wednesday',
-          'Thursday',
-          'Friday',
-          'Saturday',
-        ]);
-      } else {
-        // Si no está seleccionado, deseleccionar todos los días
-        setSelectedDays([]);
-      }
-    } else {
-      // Toggle para días individuales
-      const isSelected = selectedDays.includes(day);
-
-      if (isSelected) {
-        // Deseleccionar el día
-        setSelectedDays(
-          selectedDays.filter(selectedDay => selectedDay !== day),
-        );
-      } else {
-        // Seleccionar el día
-        setSelectedDays([...selectedDays, day]);
-      }
-    }
-  };
-
-  const renderDayButtons = () => {
-    const daysOfWeek = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-    ];
-
-    return (
-      <View
-        style={{
-          justifyContent: 'space-between',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          width: '100%',
-        }}>
-        {[...daysOfWeek, 'All days'].map(day => (
-          <TouchableOpacity
-            key={day}
-            onPress={() => toggleDaySelection(day)}
-            style={{
-              backgroundColor: selectedDays.includes(day) ? 'green' : 'gray',
-              padding: 10,
-              margin: 5,
-              borderRadius: 5,
-              flexDirection: 'row',
-              width: '10%',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-            <Text style={{color: 'white'}}>{day.slice(0, 3)}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
-  const handleAddEvent = async () => {
-    const startDate = moment(value);
-
-    if (startDate.isValid()) {
-      // Verificar si "All days" está seleccionado
-      if (selectAllDays) {
-        handleAddEvent3();
-        return;
-      }
-
-      // Verificar si no hay días seleccionados
-      if (selectedDays.length === 0) {
-        handleAddEvent2(); // Llama a handleAddEvent2 en lugar de handleAddEvent
-        return; // Sal del método handleAddEvent para evitar ejecutar el código restante
-      } else {
-        // Caso: Hay días seleccionados, agregar eventos para esos días
-        for (let i = 0; i < 4; i++) {
-          const currentWeek = startDate.clone().add(i, 'weeks');
-
-          for (const selectedDay of selectedDays) {
-            const currentDate = currentWeek.clone().day(selectedDay);
-
-            const formattedDate = currentDate.toISOString().split('T')[0];
-            const documentName = `${eventPhone}_${formattedDate}_${i + 1}`;
-
-            try {
-              const clientDocRef = doc(db, 'Clients', eventPhone);
-              const eventsCollectionRef = collection(clientDocRef, 'date');
-
-              const newEvent = {
-                id: documentName,
-                date: currentDate.toDate(),
-                name: eventText || 'Name',
-                phone: eventPhone || 'Phone',
-                address: eventAddress || 'Address',
-                neighborhood: eventNeighborhood || 'Neighborhood',
-                description: eventDesc || 'Description',
-              };
-
-              await setDoc(doc(eventsCollectionRef, documentName), newEvent);
-              console.log('Evento agregado con ID: ', documentName);
-
-              setEvents(prevEvents => [...prevEvents, newEvent]);
-            } catch (error) {
-              console.error('Error al agregar el evento a Firestore:', error);
+  const handleDeleteEvent = async eventId => {
+    Alert.alert('Delete Event', 'Are you sure you want to delete this event?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Delete',
+        onPress: async () => {
+          try {
+            const eventToDelete = events.find(event => event.id === eventId);
+            if (!eventToDelete) {
+              console.error('Event not found');
+              return;
             }
+            const clientDocRef = doc(db, 'Clients', eventToDelete.phone);
+            const eventsCollectionRef = collection(clientDocRef, 'date');
+            await deleteDoc(doc(eventsCollectionRef, eventId));
+            const updatedEvents = events.filter(event => event.id !== eventId);
+            setEvents(updatedEvents);
+          } catch (error) {
+            console.error('Error deleting event', error);
           }
-        }
-
-        setEventText('');
-        setEventPhone('');
-        setEventAddress('');
-        setEventNeighborhood('');
-        setEventDesc('');
-        setShowAddModal(false);
-
-        RegisterClients(
-          startDate,
-          eventText,
-          eventPhone,
-          eventAddress,
-          eventNeighborhood,
-          eventDesc,
-        );
-      }
-    }
-  };
-  const handleAddEvent2 = () => {
-    const formattedDate = value.toISOString().split('T')[0];
-    const documentName = `${eventPhone}_${formattedDate}`;
-
-    if (value) {
-      const newEvent = {
-        id: documentName,
-        date: value, // Convertir a un objeto Date
-        name: eventText || 'Name',
-        phone: eventPhone || 'Phone',
-        address: eventAddress || 'Address',
-        neighborhood: eventNeighborhood || 'Neighborhood',
-        description: eventDesc || 'Description',
-      };
-
-      setEvents([...events, newEvent]);
-
-      setEventText('');
-      setEventPhone('');
-      setEventAddress('');
-      setEventNeighborhood('');
-      setEventDesc('');
-      setShowAddModal(false);
-
-      RegisterClients(
-        value,
-        eventText,
-        eventPhone,
-        eventAddress,
-        eventNeighborhood,
-        eventDesc,
-      );
-    }
-  };
-
-  const [selectAllDays, setSelectAllDays] = useState(false);
-
-  const RegisterClients3 = async (
-    startDate,
-    name,
-    phone,
-    address,
-    neighborhood,
-    description,
-  ) => {
-    try {
-      // Almacena la información del cliente en la colección principal
-      const clientDocRef = doc(db, 'Clients', phone);
-      await setDoc(clientDocRef, {
-        Name: name || 'Name',
-        Phone: phone || 'Phone',
-        Address: address || 'Address',
-        Neighborhood: neighborhood || 'Neighborhood',
-        Description: description || 'Description',
-      });
-
-      // Itera sobre los próximos N días (por ejemplo, 30 días)
-      for (let i = 0; i < 30; i++) {
-        const currentDate = moment(startDate).add(i, 'days');
-        const formattedDate = currentDate.format('YYYY-MM-DD');
-        const documentName = `${phone}_${formattedDate}_${i + 1}`;
-
-        // Crea un objeto de evento para el día actual
-        const event = {
-          date: currentDate.toDate(),
-          name: name || 'Name',
-          phone: phone || 'Phone',
-          address: address || 'Address',
-          neighborhood: neighborhood || 'Neighborhood',
-          description: description || 'Description',
-        };
-
-        // Almacena el evento en la subcolección "date"
-        const eventsCollectionRef = collection(clientDocRef, 'date');
-        await setDoc(doc(eventsCollectionRef, documentName), event);
-      }
-
-      console.log(
-        'Cliente y eventos registrados exitosamente para los próximos 30 días',
-      );
-    } catch (error) {
-      console.error('Error al registrar cliente y eventos en Firestore', error);
-    }
-  };
-  const handleAddEvent3 = () => {
-    const startDate = moment(value);
-
-    if (startDate.isValid()) {
-      for (let i = 0; i < 30; i++) {
-        const currentDate = startDate.clone().add(i, 'days');
-        const formattedDate = currentDate.toISOString().split('T')[0];
-        const documentName = `${eventPhone}_${formattedDate}_${i + 1}`;
-
-        const newEvent = {
-          id: documentName,
-          date: currentDate.toDate(),
-          name: eventText || 'Name',
-          phone: eventPhone || 'Phone',
-          address: eventAddress || 'Address',
-          neighborhood: eventNeighborhood || 'Neighborhood',
-          description: eventDesc || 'Description',
-        };
-
-        setEvents(prevEvents => [...prevEvents, newEvent]);
-      }
-
-      setEventText('');
-      setEventPhone('');
-      setEventAddress('');
-      setEventNeighborhood('');
-      setEventDesc('');
-      setShowAddModal(false);
-
-      // Registra el cliente y eventos para todos los días
-      RegisterClients3(
-        startDate,
-        eventText,
-        eventPhone,
-        eventAddress,
-        eventNeighborhood,
-        eventDesc,
-      );
-    }
+        },
+        style: 'destructive',
+      },
+    ]);
   };
 
   const handleShowClientList = () => {
     setShowClientList(true);
+    setEventText('');
+    setEventPhone('');
+    setEventAddress('');
+    setEventNeighborhood('');
+    setEventDesc('');
+    setEditedEvent(null);
+    setSelectAllDays(false);
+    setSelectedDays([]);
+    setSelectAllDaysClientList(false);
+    setSelectedDaysClientList([]);
   };
 
   const handlecloseClientList = () => {
     setShowClientList(false);
+    setEventText('');
+    setEventPhone('');
+    setEventAddress('');
+    setEventNeighborhood('');
+    setEventDesc('');
+    setEditedEvent(null);
+    setSelectAllDays(false);
+    setSelectedDays([]);
+    setSelectAllDaysClientList(false);
+    setSelectedDaysClientList([]);
   };
 
   const handleClosemodal = () => {
@@ -534,6 +553,10 @@ export default function CalendarWindows() {
     setEventDesc('');
     setEditedEvent(null);
     setShowAddModal(false);
+    setSelectAllDays(false);
+    setSelectedDays([]);
+    setSelectAllDaysClientList(false);
+    setSelectedDaysClientList([]);
   };
 
   const handleHome = () => {
@@ -549,15 +572,9 @@ export default function CalendarWindows() {
     );
   };
 
-  const [selectedDaysClientList, setSelectedDaysClientList] = useState([]);
-  const [selectAllDaysClientList, setSelectAllDaysClientList] = useState(false);
-
-  const toggleDaySelectionClientList = day => {
-    if (day === 'All days') {
-      setSelectAllDaysClientList(!selectAllDaysClientList);
-
-      if (!selectAllDaysClientList) {
-        setSelectedDaysClientList([
+  const getSelectedDays = () =>
+    selectAllDays
+      ? [
           'Sunday',
           'Monday',
           'Tuesday',
@@ -565,153 +582,126 @@ export default function CalendarWindows() {
           'Thursday',
           'Friday',
           'Saturday',
-        ]);
-      } else {
-        setSelectedDaysClientList([]);
-      }
-    } else {
-      const isSelected = selectedDaysClientList.includes(day);
+        ]
+      : selectedDays;
 
-      if (isSelected) {
-        setSelectedDaysClientList(
-          selectedDaysClientList.filter(selectedDay => selectedDay !== day),
-        );
-      } else {
-        setSelectedDaysClientList([...selectedDaysClientList, day]);
-      }
-    }
-  };
-
-  // Asegúrate de que esta función se encuentre dentro del componente funcional
-  const getSelectedDays = () => {
-    if (selectAllDays) {
-      // Si "All days" está seleccionado, devolver todos los días de la semana
-      return [
-        'Sunday',
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-      ];
-    } else {
-      // Si no está seleccionado, devolver los días seleccionados individualmente
-      return selectedDays;
-    }
-  };
-
-  const handleAddClientToCalendar = async client => {
-    try {
-      const clientDocRef = doc(db, 'Clients', client.Phone);
-      const eventsCollection = collection(clientDocRef, 'date');
-  
-      const selectedDaysToggle = getSelectedDays();
-      const today = moment(); // Obtén la fecha actual
-      const startDate = today.clone().startOf('week'); // Comienza desde el inicio de la semana actual
-  
-      // Verificar si hay días seleccionados
-      if (selectedDaysToggle.length > 0) {
-        // Caso: Hay días seleccionados, agregar cliente para esos días
-        for (let i = 0; i < 4; i++) {
-          const currentWeek = startDate.clone().add(i, 'weeks');
-  
-          for (const selectedDay of selectedDaysToggle) {
-            const currentDate = currentWeek.clone().day(selectedDay);
-  
-            // Verificar si la fecha es posterior o igual a hoy
-            if (currentDate.isSameOrAfter(today)) {
-              const formattedDate = currentDate.toISOString().split('T')[0];
-              const documentName = `${client.Phone}_${formattedDate}_${i + 1}`;
-  
-              try {
-                const newEvent = {
-                  id: documentName,
-                  date: currentDate.toDate(),
+      const handleAddClientToCalendar = async client => {
+        try {
+          resetSelectedDays();
+          setShowAddModal(false);
+          const clientDocRef = doc(db, 'Clients', client.Phone);
+          const eventsCollection = collection(clientDocRef, 'date');
+          const driverName = client.driverName || 'No Driver Assigned';
+    
+          const selectedDaysToggle = getSelectedDays();
+          const today = moment();
+          const startDate = today.clone().startOf('week');
+    
+          if (selectedDaysToggle.length > 0) {
+            for (let i = 0; i < 4; i++) {
+              const currentWeek = startDate.clone().add(i, 'weeks');
+    
+              for (const selectedDay of selectedDaysToggle) {
+                const currentDate = currentWeek.clone().day(selectedDay);
+    
+                if (currentDate.isSameOrAfter(today)) {
+                  const formattedDate = currentDate.toISOString().split('T')[0];
+                  const documentName = `${client.Phone}_${formattedDate}_${i + 1}`;
+    
+                  try {
+                    const newEvent = {
+                      id: documentName,
+                      date: currentDate.toDate(),
+                      name: client.Name || 'Name',
+                      phone: client.Phone || 'Phone',
+                      address: client.Address || 'Address',
+                      neighborhood: client.Neighborhood || 'Neighborhood',
+                      description: client.Description || 'Description',
+                      driverName: client.driverName || 'Driver',
+                      driverName: driverName,
+                    };
+    
+                    await setDoc(doc(eventsCollection, documentName), newEvent);
+                    console.log('Cliente agregado con ID: ', documentName);
+    
+                    setEvents(prevEvents => [...prevEvents, newEvent]);
+                  } catch (error) {
+                    console.error(
+                      'Error al agregar el cliente a Firestore:',
+                      error,
+                    );
+                  }
+                }
+              }
+            }
+          } else {
+            try {
+              resetSelectedDays();
+              setShowAddModal(false);
+              const clientDocRef = doc(db, 'Clients', client.Phone);
+              const formattedDate = value.toISOString().split('T')[0];
+              const documentName = `${client.Phone}_${formattedDate}`;
+              const eventsCollection = collection(clientDocRef, 'date');
+              const driverName = client.driverName || 'No Driver Assigned';
+    
+    
+                // Agrega el evento a la base de datos
+                await setDoc(doc(eventsCollection, documentName), {
+                  date: value,
                   name: client.Name || 'Name',
-                  phone: client.Phone || 'Phone',
                   address: client.Address || 'Address',
                   neighborhood: client.Neighborhood || 'Neighborhood',
                   description: client.Description || 'Description',
-                };
-  
-                await setDoc(doc(eventsCollection, documentName), newEvent);
-                console.log('Cliente agregado con ID: ', documentName);
-  
-                // Crear tarjeta (card) para el nuevo evento
-                setEvents(prevEvents => [...prevEvents, newEvent]);
-              } catch (error) {
-                console.error(
-                  'Error al agregar el cliente a Firestore:',
-                  error,
-                );
-              }
+                  driverName: client.driverName || 'Driver',
+                  driverName: driverName,
+                });
+    
+                // Actualiza el estado con el nuevo evento
+                setEvents(prevEvents => [
+                  ...prevEvents,
+                  {
+                    id: documentName,
+                    date: value,
+                    name: client.Name || 'Name',
+                    phone: client.Phone || 'Phone',
+                    address: client.Address || 'Address',
+                    neighborhood: client.Neighborhood || 'Neighborhood',
+                    description: client.Description || 'Description',
+                    driver: client.driverName || 'Driver',
+                    driverName: driverName,
+                  },
+                ]);
+    
+                // Actualiza el estado de eventos agregados
+                setAddedEvents(prevAddedEvents => [
+                  ...prevAddedEvents,
+                  documentName,
+                ]);
+              
+    
+              setShowAddModal(false);
+            } catch (error) {
+              console.error('Error adding client to calendar and Firestore', error);
             }
           }
+        } catch (error) {
+          console.error('Error adding client to calendar and Firestore', error);
         }
-      } else {
-        // Si no hay días seleccionados, llamar a handleAddClientToCalendar2
-        await handleAddClientToCalendar2(client);
-      }
-  
-      // Restablecer días seleccionados a un estado inicial
-      resetSelectedDays();
-      
-      setShowAddModal(false);
-    } catch (error) {
-      console.error('Error adding client to calendar and Firestore', error);
-    }
-  };
-  
+      };
+
   const resetSelectedDays = () => {
-    // Restablecer días seleccionados a un estado inicial (puedes ajustar esto según tus necesidades)
     setSelectAllDays(false);
     setSelectedDays([]);
     setSelectAllDaysClientList(false);
     setSelectedDaysClientList([]);
   };
-  
-  const handleAddClientToCalendar2 = async client => {
-    try {
-      const clientDocRef = doc(db, 'Clients', client.Phone);
-      const formattedDate = value.toISOString().split('T')[0];
-      const documentName = `${client.Phone}_${formattedDate}`;
-      const eventsCollection = collection(clientDocRef, 'date');
-      const newEventDocRef = await setDoc(doc(eventsCollection, documentName), {
-        date: value,
-        name: client.Name || 'Name',
-        address: client.Address || 'Address',
-        neighborhood: client.Neighborhood || 'Neighborhood',
-        description: client.Description || 'Description',
-      });
-      setEvents([
-        ...events,
-        {
-          id: documentName,
-          date: value,
-          name: client.Name || 'Name',
-          phone: client.Phone || 'Phone',
-          address: client.Address || 'Address',
-          neighborhood: client.Neighborhood || 'Neighborhood',
-          description: client.Description || 'Description',
-        },
-      ]);
-      setShowAddModal(false);
-    } catch (error) {
-      console.error('Error adding client to calendar and Firestore', error);
-    }
-  };
+
   const handleCancelAdd = () => {
-    setEventText('');
-    setEventPhone('');
-    setEventAddress('');
-    setEventNeighborhood('');
-    setEventDesc('');
+    resetInputFields();
     setEditedEvent(null);
     setShowAddModal(false);
   };
 
-  // Define state to track selected clients
   const [selectedClients, setSelectedClients] = useState([]);
 
   // Function to toggle client selection
@@ -729,52 +719,45 @@ export default function CalendarWindows() {
   };
 
   // Update the renderClientList function to handle client selection
-  const renderClientList = () => {
-    return (
-      <View style={styles.clientListContainer}>
-        <View style={styles.headmodal}>
-          <Text style={styles.clientListTitle}>Client List</Text>
-          <TouchableOpacity
-            style={styles.closeClientButton}
-            onPress={handlecloseClientList}>
-            <Text style={{color: '#000', fontSize: 16}}>X</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView style={styles.clientListScrollView}>
-          {clients.map(client => (
-            <TouchableOpacity
-              key={client.id}
-              onPress={() => toggleClientSelection(client)}
-              style={[
-                styles.clientListItem,
-                {
-                  backgroundColor: selectedClients.includes(client)
-                    ? '#99ccff'
-                    : 'white',
-                },
-              ]}>
-              <Text style={styles.clientListItemText}>{client.Name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <View style={styles.dayButtonsContainer}>{renderDayButtons()}</View>
+  const renderClientList = () => (
+    <View style={styles.clientListContainer}>
+      <View style={styles.headmodal}>
+        <Text style={styles.clientListTitle}>Client List</Text>
         <TouchableOpacity
-          style={styles.addClientsButton}
-          onPress={() => {
-            // Agrega los clientes seleccionados al calendario
-            selectedClients.forEach(client =>
-              handleAddClientToCalendar(client),
-            );
-            // Restablece los clientes seleccionados
-            setSelectedClients([]);
-            // Oculta la lista de clientes
-            setShowClientList(false);
-          }}>
-          <Text style={styles.addClientsButtonText}>Add Selected Clients</Text>
+          style={styles.closeClientButton}
+          onPress={handlecloseClientList}>
+          <Text style={{color: '#000', fontSize: 16}}>X</Text>
         </TouchableOpacity>
       </View>
-    );
-  };
+      <ScrollView style={styles.clientListScrollView}>
+        {clients.map(client => (
+          <TouchableOpacity
+            key={client.id}
+            onPress={() => toggleClientSelection(client)}
+            style={[
+              styles.clientListItem,
+              {
+                backgroundColor: selectedClients.includes(client)
+                  ? '#99ccff'
+                  : 'white',
+              },
+            ]}>
+            <Text style={styles.clientListItemText}>{client.Name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <View style={styles.dayButtonsContainer}>{renderDayButtons()}</View>
+      <TouchableOpacity
+        style={styles.addClientsButton}
+        onPress={() => {
+          selectedClients.forEach(client => handleAddClientToCalendar(client));
+          setSelectedClients([]);
+          setShowClientList(false);
+        }}>
+        <Text style={styles.addClientsButtonText}>Add Selected Clients</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   const EventCard = () => {
     return (
@@ -851,9 +834,10 @@ export default function CalendarWindows() {
             <TextInput
               value={eventPhone}
               onChangeText={phone => setEventPhone(phone)}
-              style={styles.input}
+              style={[styles.input, {opacity: isEditEnabled ? 0.5 : 1}]}
               placeholder="Phone"
               placeholderTextColor="#909090"
+              editable={!isEditEnabled} // Deshabilita la edición si isEditEnabled es true
             />
             <TextInput
               value={eventAddress}
@@ -908,7 +892,7 @@ export default function CalendarWindows() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.addButton}
-                    onPress={handleAddEvent}>
+                    onPress={handleAddEventForDays}>
                     <Text
                       style={{
                         color: '#fff',
@@ -926,6 +910,7 @@ export default function CalendarWindows() {
       </View>
     );
   };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.leftbar}>
@@ -1057,9 +1042,9 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   addClientsButton: {
-    backgroundColor: '#4CAF50', // Cambia el color según tus preferencias
+    backgroundColor: '#007aff', // Cambia el color según tus preferencias
     padding: 10,
-    borderRadius: 5,
+    borderRadius: 8,
     margin: 10,
     alignItems: 'center',
   },

@@ -21,77 +21,88 @@ function AddDeliveryModal({
   isVisible,
   onClose,
   onClientSelect,
-  driverUid,
   driverInfo,
   onAddDelivery,
 }) {
   const [clientsList, setClientsList] = useState([]);
+  const [consecutive, setConsecutive] = useState(30500);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'Clients'), snapshot => {
-      const clientsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      console.log('Clients Data:', clientsData);
-      setClientsList(clientsData);
-    });
+    const unsubscribeClients = onSnapshot(
+      collection(db, 'Clients'),
+      snapshot => {
+        const clientsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        console.log('Clients Data:', clientsData);
+        setClientsList(clientsData);
+      },
+    );
+
+    // Obtener y suscribirse al valor del consecutivo al cargar el componente
+    const globalConsecutiveDocRef = doc(db, 'GlobalConsecutives', 'global');
+    const unsubscribeConsecutive = onSnapshot(
+      globalConsecutiveDocRef,
+      snapshot => {
+        setConsecutive(snapshot.data()?.consecutive || 30500);
+      },
+    );
+
     return () => {
-      unsubscribe();
+      unsubscribeClients();
+      unsubscribeConsecutive();
     };
   }, []);
 
   const handleClientSelect = async client => {
     try {
+      onClientSelect(client);
+      onAddDelivery();
+
       // Verificar si el cliente ya está asignado
       if (client.conductorAsignado) {
         Alert.alert(
-          'Cliente ya asignado',
-          'Este cliente ya está asignado a otro conductor.',
+          'Client already assigned',
+          'This client is already assigned to another driver.',
         );
         return;
       }
 
       const driverId = driverInfo.id;
-      const driverDeliveryRef = collection(db, 'User', driverId, 'delivery');
+      const driverRef = doc(db, 'User', driverId);
+      const driverDeliveryRef = collection(driverRef, 'delivery');
 
-      const newDeliveryDoc = await setDoc(
-        doc(driverDeliveryRef, client.Phone),
-        {
-          name: client.Name,
-          Phone: client.Phone,
-          Address: client.Address,
-          neighborhood: client.Neighborhood,
-          description: client.Description,
-          timestamp: Timestamp.now(),
-        },
-      );
+      // Incrementar el consecutivo global
+      const nextConsecutive = consecutive + 1;
+
+      // Crear un nuevo documento en la subcolección 'delivery' con el consecutivo
+      await setDoc(doc(driverDeliveryRef, client.Phone), {
+        name: client.Name,
+        Phone: client.Phone,
+        Address: client.Address,
+        neighborhood: client.Neighborhood,
+        description: client.Description,
+        timestamp: Timestamp.now(),
+        consecutive: nextConsecutive,
+      });
+
+      // Actualizar el número consecutivo global
+      await setDoc(doc(db, 'GlobalConsecutives', 'global'), {
+        consecutive: nextConsecutive,
+      });
 
       console.log('Delivery added successfully');
-
       // Actualizar el cliente para indicar que está asignado
       const clientsRef = collection(db, 'Clients');
       const clientDocRef = doc(clientsRef, client.Phone);
+      await setDoc(clientDocRef, {
+        ...client,
+        conductorAsignado: driverId,
+        driverName: driverInfo.name,
+      });
 
-      // Verificar si el documento ya existe en la colección 'Clients'
-      const clientDocSnapshot = await getDoc(clientDocRef);
-
-      if (clientDocSnapshot.exists()) {
-        // El documento existe, entonces puedes actualizarlo
-        await setDoc(clientDocRef, {
-          ...client,
-          conductorAsignado: driverId,
-          driverName: driverInfo.name, // Agregar el nombre del conductor
-        });
-
-        console.log('Client assigned successfully');
-      } else {
-        console.log('Client document does not exist');
-        // Aquí puedes manejar el caso donde el documento no existe si es necesario
-      }
-
-      onClientSelect(client);
-      onAddDelivery();
+      console.log('Client assigned successfully');
       onClose();
     } catch (error) {
       console.error('Error adding delivery:', error);
@@ -103,12 +114,13 @@ function AddDeliveryModal({
       const clientsRef = collection(db, 'Clients');
       await setDoc(doc(clientsRef, client.id), {
         ...client,
-        conductorAsignado: null, // Desasignar al conductor
+        conductorAsignado: null,
       });
 
       // Puedes realizar otras acciones necesarias aquí
 
       console.log('Client desassigned successfully');
+      onClose();
     } catch (error) {
       console.error('Error desassigning client:', error);
     }
@@ -126,11 +138,9 @@ function AddDeliveryModal({
             key={client.id}
             onPress={() => {
               handleClientSelect(client);
-              onClose();
             }}
             onLongPress={() => {
               handleClientDesasign(client);
-              onClose();
             }}
             style={styles.clientListItem}>
             <Text style={styles.clientListItemText}>{client.Name}</Text>
@@ -143,6 +153,9 @@ function AddDeliveryModal({
     </View>
   );
 }
+
+export default AddDeliveryModal;
+
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
@@ -189,5 +202,3 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 });
-
-export default AddDeliveryModal;

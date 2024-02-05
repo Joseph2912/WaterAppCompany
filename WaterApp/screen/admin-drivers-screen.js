@@ -1,15 +1,15 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  RefreshControl,
 } from 'react-native';
-import {Card, Avatar, List} from 'react-native-paper';
-import {collection, query, where, getDocs} from 'firebase/firestore';
-import {db} from '../firebase/firebase-config';
+import { Card, Avatar, List } from 'react-native-paper';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/firebase-config';
 import DriverModal from '../components/driver-modal';
 
 function AdminDrivers() {
@@ -19,57 +19,56 @@ function AdminDrivers() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedDriverUid, setSelectedDriverUid] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchActiveUsers = async () => {
+    try {
+      const usersCollection = collection(db, 'User');
+      const usersQuery = query(usersCollection, where('state', '==', 'active'));
+      const usersSnapshot = await getDocs(usersQuery);
+
+      const activeUsersData = await Promise.all(
+        usersSnapshot.docs.map(async userDoc => {
+          const deliveriesCollection = collection(db, 'User', userDoc.id, 'delivery');
+          const deliveriesSnapshot = await getDocs(deliveriesCollection);
+
+          const deliveryInfo = deliveriesSnapshot.docs.map(deliveryDoc => {
+            const deliveryData = deliveryDoc.data();
+            if (deliveryData) {
+              return {
+                id: deliveryDoc.id,
+                clientName: deliveryData.name || '',
+                clientAvatar: deliveryData.avatar || '',
+              };
+            } else {
+              return null;
+            }
+          });
+
+          return {
+            email: userDoc.data().email,
+            name: userDoc.data().name,
+            id: userDoc.id,
+            deliveryInfo,
+          };
+        }),
+      );
+
+      setActiveUsers(activeUsersData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching active users from Firestore', error);
+      setLoading(false);
+    }
+  };
+
+  const refreshScreen = async () => {
+    setRefreshing(true);
+    await fetchActiveUsers();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
-    const fetchActiveUsers = async () => {
-      try {
-        const usersCollection = collection(db, 'User');
-        const usersQuery = query(
-          usersCollection,
-          where('state', '==', 'active'),
-        );
-        const usersSnapshot = await getDocs(usersQuery);
-
-        const activeUsersData = await Promise.all(
-          usersSnapshot.docs.map(async userDoc => {
-            const deliveriesCollection = collection(
-              db,
-              'User',
-              userDoc.id,
-              'delivery',
-            );
-            const deliveriesSnapshot = await getDocs(deliveriesCollection);
-
-            const deliveryInfo = deliveriesSnapshot.docs.map(deliveryDoc => {
-              const deliveryData = deliveryDoc.data();
-              if (deliveryData) {
-                return {
-                  id: deliveryDoc.id,
-                  clientName: deliveryData.name || '',
-                  clientAvatar: deliveryData.avatar || '',
-                };
-              } else {
-                return null;
-              }
-            });
-
-            return {
-              email: userDoc.data().email,
-              name: userDoc.data().name,
-              id: userDoc.id,
-              deliveryInfo,
-            };
-          }),
-        );
-
-        setActiveUsers(activeUsersData);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching active users from Firestore', error);
-        setLoading(false);
-      }
-    };
-
     fetchActiveUsers();
 
     const intervalId = setInterval(fetchActiveUsers, 60000);
@@ -84,20 +83,15 @@ function AdminDrivers() {
     setSelectedClient(null);
   };
 
-  const handleClientSelect = client => {
-    setSelectedClient(client);
-    setModalVisible(true);
-  };
-
   return (
-    <View>
+    <View style={styles.container}>
       {loading ? (
         <Text style={styles.titleDelivery}>Loading...</Text>
       ) : (
         <FlatList
           data={activeUsers}
           keyExtractor={item => item.id}
-          renderItem={({item}) => (
+          renderItem={({ item }) => (
             <TouchableOpacity
               key={item.id}
               onPress={() => {
@@ -106,7 +100,8 @@ function AdminDrivers() {
                   setModalVisible(true);
                 }
               }}
-              style={modalVisible ? styles.disabledListItem : null}>
+              style={modalVisible ? styles.disabledListItem : null}
+            >
               <Card style={styles.cards}>
                 <Card.Content>
                   <List.Item
@@ -123,30 +118,28 @@ function AdminDrivers() {
                     )}
                   />
                   <Text style={styles.titleDelivery}>Deliverys</Text>
-                  <ScrollView
+                  <FlatList
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    style={styles.clientListScrollView}>
-                    {item.deliveryInfo &&
-                      Array.isArray(item.deliveryInfo) &&
-                      item.deliveryInfo.map(delivery => (
-                        <View style={styles.clientInfo} key={delivery.id}>
-                          <Avatar.Text
-                            size={30}
-                            labelStyle={styles.labelStyle}
-                            label={
-                              delivery.clientName
-                                ? delivery.clientName[0].toUpperCase()
-                                : ''
-                            }
-                          />
-                        </View>
-                      ))}
-                  </ScrollView>
+                    data={item.deliveryInfo}
+                    keyExtractor={delivery => delivery.id}
+                    renderItem={({ item: delivery }) => (
+                      <View style={styles.clientInfo} key={delivery.id}>
+                        <Avatar.Text
+                          size={30}
+                          labelStyle={styles.labelStyle}
+                          label={delivery.clientName ? delivery.clientName[0].toUpperCase() : ''}
+                        />
+                      </View>
+                    )}
+                  />
                 </Card.Content>
               </Card>
             </TouchableOpacity>
           )}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={refreshScreen} />
+          }
         />
       )}
       {selectedDriver && (
@@ -164,15 +157,17 @@ function AdminDrivers() {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
+  container: {
+    height: '100%',
+  },
   cards: {
     backgroundColor: '#fff',
     justifyContent: 'flex-start',
     alignContent: 'flex-start',
     flexDirection: 'row',
     borderRadius: 16,
-    marginBottom: 3,
+    marginBottom: 5,
     marginTop: 16,
   },
   disabledListItem: {

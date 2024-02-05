@@ -1,4 +1,4 @@
-/*import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {SafeAreaView, StyleSheet, View, Text} from 'react-native';
 import MapView, {Marker} from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
@@ -16,12 +16,39 @@ const MapScreen = () => {
   });
   const [locationObtained, setLocationObtained] = useState(false);
 
+  const MemoizedMapView = useCallback(
+    () => (
+      <MapView
+        style={styles.mapStyle}
+        initialRegion={{
+          latitude: position.latitude,
+          longitude: position.longitude,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        }}
+        showsUserLocation={true}
+        followsUserLocation={true}
+        customMapStyle={mapStyle}>
+        <Marker
+          draggable
+          coordinate={{
+            latitude: position.latitude,
+            longitude: position.longitude,
+          }}
+          onDragEnd={e => alert(JSON.stringify(e.nativeEvent.coordinate))}
+          title={'Test Marker'}
+          description={'This is a description of the marker'}
+        />
+      </MapView>
+    ),
+    [position],
+  );
+
   useEffect(() => {
     const watchId = Geolocation.watchPosition(
       async pos => {
         const crd = pos.coords;
 
-        // Calcular la distancia entre la ubicación actual y la última conocida
         const distance = calculateDistance(
           position.latitude,
           position.longitude,
@@ -30,7 +57,6 @@ const MapScreen = () => {
         );
 
         if (distance >= 10) {
-          // Actualizar si la distancia es mayor o igual a 10 metros
           try {
             const userRef = doc(db, 'User', auth.currentUser.uid);
             await updateDoc(userRef, {
@@ -45,16 +71,16 @@ const MapScreen = () => {
               longitudeDelta: 0.0421,
             });
 
-            setLocationObtained(true); // Marcar la ubicación como obtenida
+            setLocationObtained(true);
           } catch (error) {
             console.error('Error updating location in Firestore:', error);
-            setLocationObtained(true); // Marcar la ubicación como obtenida incluso si hay un error
+            setLocationObtained(true);
           }
         }
       },
       err => {
         console.error(err);
-        setLocationObtained(true); // Marcar la ubicación como obtenida incluso si hay un error
+        setLocationObtained(true);
       },
       {enableHighAccuracy: true, distanceFilter: 10},
     );
@@ -64,7 +90,7 @@ const MapScreen = () => {
     };
   }, [auth, position]);
 
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = deg2rad(lat2 - lat1);
     const dLon = deg2rad(lon2 - lon1);
@@ -75,41 +101,20 @@ const MapScreen = () => {
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // Distancia en kilómetros
+    const distance = R * c * 1000; // Distancia en metros
 
-    return distance * 1000;
-  };
+    return distance;
+  }, []);
 
-  const deg2rad = deg => {
+  const deg2rad = useCallback(deg => {
     return deg * (Math.PI / 180);
-  };
+  }, []);
 
   return (
     <SafeAreaView style={{flex: 1}}>
       <View style={styles.container}>
         {locationObtained ? (
-          <MapView
-            style={styles.mapStyle}
-            initialRegion={{
-              latitude: position.latitude,
-              longitude: position.longitude,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
-            }}
-            showsUserLocation={true}
-            followsUserLocation={true}
-            customMapStyle={mapStyle}>
-            <Marker
-              draggable
-              coordinate={{
-                latitude: position.latitude,
-                longitude: position.longitude,
-              }}
-              onDragEnd={e => alert(JSON.stringify(e.nativeEvent.coordinate))}
-              title={'Test Marker'}
-              description={'This is a description of the marker'}
-            />
-          </MapView>
+          <MemoizedMapView />
         ) : (
           <Text style={styles.loading}>Loading...</Text>
         )}
@@ -249,4 +254,3 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Bold',
   },
 });
-*/

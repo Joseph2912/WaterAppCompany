@@ -13,6 +13,7 @@ import DriverDetailsScreen from '../screen/ditails-delivery-screen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Platform} from 'react-native';
 import ForgotPassword from '../screen/forgotPassword-screen';
+import MapScreen from './map-for-drivers';
 
 // Create navigation stacks and drawer
 const Stack = createNativeStackNavigator();
@@ -24,7 +25,7 @@ const DrawerAdmin = () => (
     initialRouteName="HomeAdmin"
     drawerContent={props => <ContentDrawer {...props} />}>
     <Drawer.Screen
-      name="HomeAdmin"
+      name="Dashboard"
       component={Admin}
       options={{
         headerShown: Platform.OS === 'ios' || Platform.OS === 'android',
@@ -67,7 +68,7 @@ const Nav = () => (
       <Stack.Screen name="Admin" component={DrawerAdmin} />
       <Stack.Screen name="DriverScreen" component={DrawerUser} />
       <Stack.Screen name="DriverDetails" component={DriverDetailsScreen} />
-
+      <Stack.Screen name="MapScreen" component={MapScreen} />
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="Forgot" component={ForgotPassword} />
       <Stack.Screen name="SignUp" component={SignUp} />
@@ -77,4 +78,4 @@ const Nav = () => (
 
 export default Nav;
 
-//   <Stack.Screen name="MapScreen" component={MapScreen} />
+//

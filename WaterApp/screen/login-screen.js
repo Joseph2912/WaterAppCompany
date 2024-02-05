@@ -19,62 +19,51 @@ function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Check if the user is already signed in when the component mounts
   useEffect(() => {
-    const checkIfUserIsSignedIn = async () => {
-      onAuthStateChanged(auth, async user => {
-        if (user) {
-          if (!user.emailVerified) {
-            console.log('Error: Email not verified.');
+    const unsubscribe = onAuthStateChanged(auth, async user => {
+      if (user) {
+        if (!user.emailVerified) {
+          console.log('Error: Email not verified.');
+          return;
+        }
 
-            return;
-          }
+        const uid = user.uid;
+        const userDocRef = doc(db, 'User', uid);
+        const userDocSnapshot = await getDoc(userDocRef);
 
-          const uid = user.uid;
+        if (userDocSnapshot.exists()) {
+          const role = userDocSnapshot.data().Rol;
+          console.log(`User is already signed in. Role of the user: ${role}`);
 
-          const userDocRef = doc(db, 'User', uid);
-          const userDocSnapshot = await getDoc(userDocRef);
-
-          if (userDocSnapshot.exists()) {
-            const role = userDocSnapshot.data().Rol;
-            console.log(`User is already signed in. Role of the user: ${role}`);
-
-            if (role === 0) {
-              console.log('Redirecting to Admin page');
-              navigation.reset({
-                index: 0,
-                routes: [{name: 'Admin'}],
-              });
-            } else {
-              try {
-                const clientDocRef = doc(db, 'User', uid);
-                await updateDoc(clientDocRef, {
-                  estado: 'activo',
-                });
-                console.log('Client updated in Firestore');
-              } catch (error) {
-                console.error('Error updating client in Firestore', error);
-              }
-              console.log('Updating user state to "activo"');
-              console.log('Redirecting to TestUser page');
-              navigation.reset({
-                index: 0,
-                routes: [{name: 'TestUser'}],
-              });
-            }
+          if (role === 0) {
+            console.log('Redirecting to Admin page');
+            navigation.reset({
+              index: 0,
+              routes: [{name: 'Admin'}],
+            });
           } else {
-            console.log('Error: User document not found.');
+            try {
+              const clientDocRef = doc(db, 'User', uid);
+              await updateDoc(clientDocRef, {
+                state: 'active',
+              });
+              console.log('Client updated in Firestore');
+            } catch (error) {
+              console.error('Error updating client in Firestore', error);
+            }
+            console.log('Updating user state to "activo"');
+            console.log('Redirecting to DriverScreen page');
+            navigation.replace('DriverScreen');
           }
         } else {
-          console.log('User is not signed in.');
+          console.log('Error: User document not found.');
         }
-      });
-    };
+      }
+    });
 
-    checkIfUserIsSignedIn();
+    return () => unsubscribe();
   }, [navigation]);
 
-  // Attempt to log in when the login button is pressed
   const onLogin = async () => {
     try {
       setLoading(true);
@@ -84,7 +73,6 @@ function Login() {
     }
   };
 
-  // State to manage the focus of email and password inputs
   const [isInputEmailFocused, setIsInputEmailFocused] = useState(false);
   const [isInputPassFocused, setIsInputPassFocused] = useState(false);
 

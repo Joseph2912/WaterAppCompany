@@ -1,4 +1,4 @@
-/*import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,7 @@ import {
   View,
   Linking,
   Alert,
+  TextInput,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import {
@@ -25,6 +26,7 @@ import Icon from 'react-native-vector-icons/Feather';
 
 const DriverScreen = ({navigation}) => {
   const auth = getAuth();
+
   const [position, setPosition] = useState({
     latitude: null,
     longitude: null,
@@ -34,31 +36,43 @@ const DriverScreen = ({navigation}) => {
   const [deliveries, setDeliveries] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [locationObtained, setLocationObtained] = useState(false);
+  const [deliveryInputs, setDeliveryInputs] = useState([]);
+  const [driverName, setDriverName] = useState('');
 
   useEffect(() => {
-    const fetchDeliveries = async () => {
+    const fetchData = async () => {
       try {
         const userRef = doc(db, 'User', auth.currentUser.uid);
+        const userDoc = await getDoc(userRef);
+        // Resto del código...
+        // Obtener el nombre del conductor
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setDriverName(userData.name || '');
+        }
         const deliveriesQuery = query(collection(userRef, 'delivery'));
         const querySnapshot = await getDocs(deliveriesQuery);
         const deliveriesData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         }));
+        const deliveriesDataWithInputs = deliveriesData.map(delivery => ({
+          ...delivery,
+          amountEntered: '',
+          information: '',
+        }));
+
+        setDeliveryInputs(deliveriesDataWithInputs);
         setDeliveries(deliveriesData);
       } catch (error) {
-        console.error('Error fetching deliveries:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setRefreshing(false);
       }
     };
 
-    fetchDeliveries();
-
     const updateLocation = async pos => {
       const crd = pos.coords;
-
-      // Calcular la distancia entre la ubicación actual y la última conocida
       const distance = calculateDistance(
         position.latitude,
         position.longitude,
@@ -67,7 +81,6 @@ const DriverScreen = ({navigation}) => {
       );
 
       if (distance >= 10) {
-        // Actualizar si la distancia es mayor o igual a 10 metros
         try {
           const userRef = doc(db, 'User', auth.currentUser.uid);
           await updateDoc(userRef, {
@@ -99,10 +112,12 @@ const DriverScreen = ({navigation}) => {
       {enableHighAccuracy: true, distanceFilter: 10},
     );
 
+    fetchData(); // Llamada inicial para cargar datos al entrar a la pantalla
+
     return () => {
       Geolocation.clearWatch(watchId);
     };
-  }, [auth, refreshing, position]);
+  }, [auth]); // Solo se ejecutará cuando 'auth' cambie
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
@@ -124,11 +139,58 @@ const DriverScreen = ({navigation}) => {
     return deg * (Math.PI / 180);
   };
 
-  const deleteDeliveryFromConductor = async deliveryId => {
+  const handleCheckboxChange = (itemIndex, paymentMethod) => {
+    const updatedDeliveries = [...deliveries];
+    updatedDeliveries[itemIndex][paymentMethod] =
+      !updatedDeliveries[itemIndex][paymentMethod];
+
+    // Agregar console.log para depurar
+    console.log(
+      `Checkbox state updated: ${paymentMethod} - ${updatedDeliveries[itemIndex][paymentMethod]}`,
+    );
+
+    setDeliveries(updatedDeliveries);
+  };
+
+  const updateDeliveryInputs = (itemIndex, field, value) => {
+    const updatedInputs = [...deliveryInputs];
+    updatedInputs[itemIndex][field] = value;
+
+    // Reset values for the next delivery
+    if (itemIndex < updatedInputs.length - 1) {
+      updatedInputs[itemIndex + 1].amountEntered = '';
+      updatedInputs[itemIndex + 1].information = '';
+    }
+
+    setDeliveryInputs(updatedInputs);
+  };
+
+  const deleteDeliveryFromConductor = async (deliveryId, itemIndex) => {
     try {
       const userRef = doc(db, 'User', auth.currentUser.uid);
       const deliveryDocRef = doc(collection(userRef, 'delivery'), deliveryId);
       const deliveryData = (await getDoc(deliveryDocRef)).data();
+
+      // Check if either 'cash' or 'charge' is selected
+      if (
+        !deliveries[itemIndex].cashChecked &&
+        !deliveries[itemIndex].chargeChecked
+      ) {
+        Alert.alert(
+          'Alert',
+          'Please select either Cash or Charge payment method.',
+        );
+        return;
+      }
+
+      // Check if 'amountEntered' is filled
+      if (!deliveryInputs[itemIndex]?.amountEntered) {
+        Alert.alert(
+          'Alert',
+          'Please enter the received amount before completing the delivery.',
+        );
+        return;
+      }
 
       Alert.alert(
         'Confirmation',
@@ -141,22 +203,34 @@ const DriverScreen = ({navigation}) => {
           {
             text: 'Yes',
             onPress: async () => {
-              await sendEmail(deliveryData);
+              await sendEmail(
+                deliveryData,
+                deliveries[itemIndex].cashChecked,
+                deliveries[itemIndex].chargeChecked,
+                deliveryInputs[itemIndex]?.amountEntered || '',
+                deliveryInputs[itemIndex]?.information || '',
+                itemIndex, // Pass the index here
+              );
 
               await deleteDoc(deliveryDocRef);
 
               try {
-                const userRef = doc(db, 'User', auth.currentUser.uid);
-                const deliveriesQuery = query(collection(userRef, 'delivery'));
-                const querySnapshot = await getDocs(deliveriesQuery);
-                const deliveriesData = querySnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data(),
-                }));
-                setDeliveries(deliveriesData);
+                const updatedDeliveries = [...deliveries];
+                updatedDeliveries.splice(itemIndex, 1); // Remove the completed delivery from the state
+                setDeliveries(updatedDeliveries);
               } catch (error) {
-                console.error('Error fetching deliveries:', error);
+                console.error('Error updating deliveries state:', error);
               }
+
+              // Add the code to update the Clients collection here
+              const clientsRef = collection(db, 'Clients');
+              const phoneNumber = deliveryId;
+              const clientDocRef = doc(clientsRef, phoneNumber);
+
+              await updateDoc(clientDocRef, {
+                conductorAsignado: '',
+                driverName: '',
+              });
             },
           },
         ],
@@ -167,21 +241,59 @@ const DriverScreen = ({navigation}) => {
     }
   };
 
-  const sendEmail = async deliveryData => {
+  const sendEmail = async (
+    deliveryData,
+    cashChecked,
+    chargeChecked,
+    amountEntered,
+    information,
+    index,
+  ) => {
     try {
       const email = 'joseph.marulanda@uao.edu.co';
       const subject = `Completed the delivery of ${deliveryData.name}`;
-      const body = `Detalles del delivery:
-        Nombre: ${deliveryData.name}
-        Phone: ${deliveryData.Phone}
-        Address: ${deliveryData.Address}
-        Neighborhood: ${deliveryData.neighborhood}
-        Description: ${deliveryData.description}`;
+
+      // Usar el estado driverName en el cuerpo del correo electrónic
+
+      const cashStatus = cashChecked ? 'Yes' : 'No';
+      const chargeStatus = chargeChecked ? 'Yes' : 'No';
+
+      const receivedAmount = amountEntered || '';
+      const additionalInformation = information || '';
+
+      console.log(
+        `Email details - Cash: ${cashStatus}, Charge: ${chargeStatus}, Received amount: $${amountEntered}, Additional information: ${information}`,
+      );
+
+      const body = `
+INVOICER
+N° ${deliveryData.consecutive}
+
+Signature: ${driverName} 
+--------------------------------------------------
+Client Information
+
+Name: ${deliveryData.name}
+Phone: ${deliveryData.Phone}
+Address: ${deliveryData.Address}
+Neighborhood: ${deliveryData.neighborhood}
+Description: ${deliveryData.description}
+---------------------------------------------------
+Payment details
+
+Cash: ${cashStatus}
+Charge: ${chargeStatus}
+Received amount: $${receivedAmount}
+Additional information: ${additionalInformation}
+      `;
 
       const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(
         subject,
       )}&body=${encodeURIComponent(body)}`;
+
       await Linking.openURL(mailtoLink);
+      deliveryInputs[index] = {amountEntered: '', information: ''};
+      setDeliveryInputs(deliveryInputs);
     } catch (error) {
       console.error('Error sending email:', error);
     }
@@ -198,7 +310,18 @@ const DriverScreen = ({navigation}) => {
         const deliveriesData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
+          cashChecked: false,
+          chargeChecked: false,
         }));
+
+        // Reset deliveryInputs state
+        const deliveriesDataWithInputs = deliveriesData.map(delivery => ({
+          ...delivery,
+          amountEntered: '',
+          information: '',
+        }));
+        setDeliveryInputs(deliveriesDataWithInputs);
+
         setDeliveries(deliveriesData);
       } catch (error) {
         console.error('Error fetching deliveries:', error);
@@ -211,7 +334,6 @@ const DriverScreen = ({navigation}) => {
       setRefreshing(false);
     }
   };
-
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity
@@ -231,37 +353,99 @@ const DriverScreen = ({navigation}) => {
         <Text style={styles.Text}>Here you can see all your deliveries.</Text>
       </View>
       <FlatList
-        data={deliveries}
+        data={deliveries.map((delivery, index) => ({
+          ...delivery,
+          amountEntered: deliveryInputs[index]?.amountEntered || '',
+          information: deliveryInputs[index]?.information || '',
+        }))}
         keyExtractor={item => item.id}
-        renderItem={({item}) => (
+        renderItem={({item, index}) => (
           <View key={item.id} style={styles.deliveryContainer}>
             <View style={styles.idcontainer}>
               <Text style={styles.deliveryTitle}>DELIVERY ID:</Text>
-              <Text style={styles.deliveryinfoid}># {item.id}</Text>
+              <Text style={styles.deliveryinfoid}># {item.consecutive}</Text>
             </View>
             <View style={styles.infocontainer}>
-              <Text style={styles.deliveryText}>NAME </Text>
-              <Text style={styles.deliveryinfo}>{item.name}</Text>
+              <Text style={styles.paymentText}>Customer Information</Text>
+              <Text style={styles.deliveryText}>
+                NAME: <Text style={styles.deliveryinfo}>{item.name}</Text>
+              </Text>
             </View>
             <View style={styles.infocontainer}>
-              <Text style={styles.deliveryText}>PHONE </Text>
-              <Text style={styles.deliveryinfo}>{item.Phone}</Text>
+              <Text style={styles.deliveryText}>
+                PHONE: <Text style={styles.deliveryinfo}>{item.Phone}</Text>
+              </Text>
             </View>
             <View style={styles.infocontainer}>
-              <Text style={styles.deliveryText}>ADDRESS</Text>
-              <Text style={styles.deliveryinfo}>{item.Address}</Text>
+              <Text style={styles.deliveryText}>
+                ADDRESS: <Text style={styles.deliveryinfo}>{item.Address}</Text>
+              </Text>
             </View>
             <View style={styles.infocontainer}>
-              <Text style={styles.deliveryText}>NEIGHBORHOOD</Text>
-              <Text style={styles.deliveryinfo}> {item.neighborhood}</Text>
+              <Text style={styles.deliveryText}>
+                NEIGHBORHOOD:{' '}
+                <Text style={styles.deliveryinfo}> {item.neighborhood}</Text>
+              </Text>
             </View>
             <View style={styles.infocontainer}>
-              <Text style={styles.deliveryText}>COMMENT:</Text>
-              <Text style={styles.deliveryinfo}>{item.description}</Text>
+              <Text style={styles.deliveryText}>
+                COMMENT:{' '}
+                <Text style={styles.deliveryinfo}>{item.description}</Text>
+              </Text>
+            </View>
+            <View style={styles.paymentContainer}>
+              <View style={styles.checkboxContainer}>
+                <Text style={styles.paymentText}>Payment:</Text>
+                <View style={styles.test}>
+                  <View style={styles.touchable}>
+                    <TouchableOpacity
+                      style={[
+                        styles.checkbox,
+                        item.cashChecked && styles.checkedCheckbox,
+                      ]}
+                      onPress={() =>
+                        handleCheckboxChange(index, 'cashChecked')
+                      }></TouchableOpacity>
+                    <Text style={styles.checkboxText}>Cash</Text>
+                  </View>
+                  <View style={styles.touchable}>
+                    <TouchableOpacity
+                      style={[
+                        styles.checkbox,
+                        item.chargeChecked && styles.checkedCheckbox,
+                      ]}
+                      onPress={() =>
+                        handleCheckboxChange(index, 'chargeChecked')
+                      }></TouchableOpacity>
+                    <Text style={styles.checkboxText}>Charge</Text>
+                  </View>
+                </View>
+              </View>
+              <Text style={styles.paymentText}>Received Amount</Text>
+              <TextInput
+                style={styles.amountInput}
+                keyboardType="numeric"
+                maxLength={30}
+                minLength={16}
+                value={deliveryInputs[index]?.amountEntered || ''}
+                onChangeText={text => {
+                  updateDeliveryInputs(index, 'amountEntered', text);
+                }}
+              />
+              <Text style={styles.paymentText}>Additional Information</Text>
+              <TextInput
+                style={styles.amountInput}
+                keyboardType="default"
+                maxLength={244}
+                value={deliveryInputs[index]?.information || ''}
+                onChangeText={text => {
+                  updateDeliveryInputs(index, 'information', text);
+                }}
+              />
             </View>
             <TouchableOpacity
               style={styles.emailButton}
-              onPress={() => deleteDeliveryFromConductor(item.id)}>
+              onPress={() => deleteDeliveryFromConductor(item.id, index)}>
               <Text style={styles.emailButtonText}>DELIVERED</Text>
             </TouchableOpacity>
           </View>
@@ -290,6 +474,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontFamily: 'Roboto-Bold',
   },
+  test: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '50%',
+    marginLeft: 30,
+  },
   map: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -305,10 +495,14 @@ const styles = StyleSheet.create({
   idcontainer: {
     flexDirection: 'row',
     padding: 10,
+    marginBottom: 10,
     justifyContent: 'space-between',
+    borderBottomWidth: 1.5,
+    borderColor: '#ddd',
   },
   infocontainer: {
-    padding: 10,
+    padding: 2,
+    paddingLeft: 10,
     justifyContent: 'space-between',
   },
   Text: {
@@ -316,6 +510,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     textAlign: 'left',
     fontFamily: 'Nunito-Medium',
+  },
+  touchable: {
+    flexDirection: 'row',
+    width: 'auto',
+    marginRight: 30,
   },
   menu: {
     justifyContent: 'center',
@@ -369,7 +568,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
     marginBottom: 10,
     height: 48,
   },
@@ -390,7 +588,62 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
   },
+  paymentContainer: {
+    borderTopWidth: 1.5,
+    borderColor: '#ddd',
+    marginTop: 10,
+    paddingTop: 20,
+    marginBottom: 15,
+    paddingLeft: 10,
+  },
+  paymentText: {
+    fontFamily: 'Roboto-Bold',
+    fontSize: 16,
+    marginBottom: 5,
+    color: 'black',
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  checkedCheckbox: {
+    backgroundColor: '#007aff',
+  },
+  checkboxText: {
+    color: 'black',
+    fontFamily: 'Nunito-Medium',
+    fontSize: 16,
+  },
+  amountInput: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 10,
+    fontFamily: 'Nunito-Medium',
+    fontSize: 16,
+    color: '#000',
+  },
+  signatureContainer: {
+    marginTop: 20,
+  },
+  signatureText: {
+    fontFamily: 'Roboto-Bold',
+    fontSize: 18,
+    color: '#333',
+  },
 });
 
 export default DriverScreen;
-*/
